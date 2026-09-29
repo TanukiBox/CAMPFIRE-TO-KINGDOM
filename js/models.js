@@ -188,7 +188,25 @@ function smithy(b) {
   return g;
 }
 
-export const BUILDINGS = { house, sawmill, stonework, shop, smithy };
+function storage() {
+  const g = new THREE.Group(), red = 0xc8553d, white = 0xfff6ea;
+  box(g, 3.6, 0.24, 3.0, C.stoneD, 0, 0.12, 0);
+  box(g, 3.2, 1.8, 2.6, red, 0, 1.14, 0);
+  box(g, 3.24, 0.12, 2.64, white, 0, 2.04, 0);
+  for (const x of [-1.6, 1.6]) box(g, 0.14, 1.8, 2.64, white, x, 1.14, 0);
+  roof(g, 3.8, 1.3, 3.2, 0x7a4a36, 0, 2.08, 0);
+  box(g, 1.3, 1.4, 0.08, 0x8a3a2a, 0, 0.94, 1.31);
+  box(g, 0.1, 1.8, 0.06, white, 0, 0.94, 1.36, 0, 0, 0.75);
+  box(g, 0.1, 1.8, 0.06, white, 0, 0.94, 1.36, 0, 0, -0.75);
+  box(g, 1.44, 0.12, 0.1, white, 0, 1.68, 1.34);
+  box(g, 0.5, 0.5, 0.5, C.wood, 1.35, 0.49, 1.7, 0, 0.3, 0);
+  box(g, 0.4, 0.4, 0.4, C.woodL, 1.3, 0.94, 1.7, 0, -0.2, 0);
+  cyl(g, 0.25, 0.6, C.woodD, -1.4, 0.54, 1.7, 0, 0, 0, 8);
+  box(g, 0.7, 0.35, 0.7, 0xe8c85a, -2.1, 0.41, 0.6, 0, 0.4, 0);
+  return g;
+}
+
+export const BUILDINGS = { house, sawmill, stonework, shop, smithy, storage };
 
 // ---- 焚き火 ----
 export function campfire() {

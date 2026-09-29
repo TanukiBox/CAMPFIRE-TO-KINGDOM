@@ -5,7 +5,12 @@ export const PLAYER = {
   regenDelay: 4,       // 攻撃を受けてから回復が始まるまでの秒数
   regenPerSec: 0.8,
   reachEnemy: 1.5,
+  jellyHeal: 3,        // ゼリー1個で回復するHP（HPがこれだけ減ると背中のゼリーを自動で食べる）
+  jellyCd: 1.5,        // 続けて食べるまでの秒数
 };
+
+// 倉庫に預けられる数（預けた素材は建設マス・加工場・お店・鍛冶屋で自動で使われる）
+export const STORAGE = { cap: 200 };
 
 // 強化（コインだけ）。values[レベル] が効果、costs[レベル] が次のレベルへの値段
 export const UPGRADES = {
@@ -25,7 +30,7 @@ export const TOOLS = {
 export const MATERIALS = {
   wood:  { color: 0xc98a4b, h: 0.21 },
   stone: { color: 0xa7abb2, h: 0.25 },
-  jelly: { color: 0x86e36f, h: 0.23 },
+  jelly: { color: 0x86e36f, h: 0.23, price: 2 },
   plank: { color: 0xecc78e, h: 0.12, price: 4 },
   block: { color: 0xdedad2, h: 0.27, price: 6 },
 };
@@ -102,6 +107,7 @@ export const CHAPTERS = {
     campfire: [0, 0],
     start: [0, 2.2],
     gate: { x: 5.5, z: 13, w: 2.6 },   // 客が入ってくる門
+    burn: [2.3, -1.7],                 // いらない素材を焚き火にくべるマス
     lands: [
       { id: 'home',  rect: { x0: -17, x1: 17, z0: -17, z1: 13 } },
       { id: 'east',  rect: { x0: 17, x1: 33, z0: -17, z1: 13 } },
@@ -143,6 +149,8 @@ export const CHAPTERS = {
         process: { from: 'stone', to: 'block', time: 1.8, inCap: 30, outCap: 40, input: [-1.4, 2.4], output: [1.5, 2.4] } },
       { id: 'smithy',    type: 'repair', model: 'smithy',    x: -5,  z: 6.5, w: 3.4, d: 3.0, tile: [-5, 9.3],    cost: { block: 8, plank: 8, jelly: 6 },  appear: 'smithy',
         anvil: [0, 2.8] },
+      { id: 'storage',   type: 'build',  model: 'storage',   x: -1,  z: -9.5, w: 3.6, d: 3.0, tile: [-1, -6.7],  cost: { plank: 10, stone: 10 },          appear: 'storage',
+        storage: [0, 2.8] },
       { id: 'house2',    type: 'build',  model: 'house',     x: -11, z: 8.5, w: 3.4, d: 3.0, tile: [-11, 11.3],  cost: { plank: 12, block: 8 },           appear: 'house2', pop: 2 },
       { id: 'east',      type: 'land',   land: 'east',                                        tile: [15.3, 9],    cost: { coin: 120 },                     appear: 'buy_east' },
       { id: 'house3',    type: 'build',  model: 'house',     x: 12,  z: 8.5, w: 3.4, d: 3.0, tile: [12, 11.2],   cost: { plank: 16, block: 12 },          appear: 'house3', pop: 2 },
@@ -162,6 +170,7 @@ export const CHAPTERS = {
       { id: 'stock',     type: 'stock',   n: 5, reward: 10 },
       { id: 'coins',     type: 'earn',    n: 30, reward: 10, unlock: ['upgrade'] },
       { id: 'upgrade',   type: 'upgrade', n: 1, reward: 20 },
+      { id: 'storage',   type: 'build',   target: 'storage', reward: 20 },
       { id: 'stonework', type: 'build',   target: 'stonework', reward: 20 },
       { id: 'blocks',    type: 'make',    kind: 'block', n: 5, reward: 20 },
       { id: 'smithy',    type: 'build',   target: 'smithy', reward: 30 },

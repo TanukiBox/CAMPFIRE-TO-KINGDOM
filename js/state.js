@@ -9,9 +9,11 @@ export const S = {
   hired: [],                 // 雇った順の仕事名
   lands: ['home'],
   mission: 0, mp: 0,         // 今のミッションと進み具合
+  missionId: null,
   unlocked: {},
   stations: {},              // 加工場の { in, out, t }
-  shop: { stock: { plank: 0, block: 0 }, coins: 0 },
+  shop: { stock: { plank: 0, block: 0, jelly: 0 }, coins: 0 },
+  storage: {},               // 倉庫の中身
   cleared: {},
   bossDead: false,
   time: 0,
@@ -22,7 +24,7 @@ export const S = {
 export function resetState() {
   const fresh = {
     ch: 1, coins: 0, earned: 0, up: { bag: 0, speed: 0, hp: 0 }, tool: { sword: 0, axe: 0, pick: 0 }, hired: [], lands: ['home'],
-    mission: 0, mp: 0, unlocked: {}, stations: {}, shop: { stock: { plank: 0, block: 0 }, coins: 0 }, cleared: {}, bossDead: false,
+    mission: 0, mp: 0, unlocked: {}, stations: {}, shop: { stock: { plank: 0, block: 0, jelly: 0 }, coins: 0 }, storage: {}, cleared: {}, bossDead: false,
     time: 0, lastSeen: 0, stats: { sold: 0, kills: 0 },
   };
   for (const k in S) delete S[k];
@@ -36,7 +38,7 @@ export function loadState(d) {
     if (S[k] && typeof S[k] === 'object' && !Array.isArray(S[k])) S[k] = { ...S[k], ...d[k] };
     else S[k] = d[k];
   }
-  S.shop.stock = { plank: 0, block: 0, ...(d.shop && d.shop.stock) };
+  S.shop.stock = { plank: 0, block: 0, jelly: 0, ...(d.shop && d.shop.stock) };
 }
 
 export const stat = {

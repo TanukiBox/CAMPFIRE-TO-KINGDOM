@@ -149,11 +149,14 @@ export class Builds {
       coins.send(player.pos.x, 1.3, player.pos.z, () => ({ x: tx, y: 0.3, z: tz }), 0.35, () => arrive('coin', n));
       return true;
     }
-    const it = items.take(player, k => this.left(site, k) > 0);
+    // 背中から。なければ倉庫から
+    const pred = k => this.left(site, k) > 0;
+    const it = items.take(player, pred) || (hooks.fromStorage ? hooks.fromStorage(pred) : null);
     if (!it) return false;
     const kind = it.kind;
     site.inflight[kind] = (site.inflight[kind] || 0) + 1;
-    items.flyTo(it, tx + (Math.random() - 0.5) * 0.6, 0.25, tz + (Math.random() - 0.5) * 0.6, 0.32, () => arrive(kind, 1));
+    const dur = 0.32 + Math.min(0.5, Math.hypot(it.p.x - tx, it.p.z - tz) * 0.025);
+    items.flyTo(it, tx + (Math.random() - 0.5) * 0.6, 0.25, tz + (Math.random() - 0.5) * 0.6, dur, () => arrive(kind, 1));
     return true;
   }
 

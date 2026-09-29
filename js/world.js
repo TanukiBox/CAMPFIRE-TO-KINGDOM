@@ -33,6 +33,7 @@ export class World {
     this.circles = [];
     this.boxes = [];
     this.lush = 0;
+    this.fireBoost = 0;
     this.makeGround();
     const cf = campfire();
     cf.group.position.set(ch.campfire[0], 0, ch.campfire[1]);
@@ -207,10 +208,12 @@ export class World {
     this.paintGround();
   }
 
-  update(t) {
+  update(t, dt = 0) {
+    this.fireBoost = Math.max(0, this.fireBoost - dt * 1.5);
+    const boost = 1 + this.fireBoost * 0.9;
     this.flames.forEach((f, i) => {
       const b = f.userData.base;
-      const k = 1 + Math.sin(t * (9 + i * 3) + i) * 0.12 + Math.sin(t * 17 + i * 2) * 0.06;
+      const k = (1 + Math.sin(t * (9 + i * 3) + i) * 0.12 + Math.sin(t * 17 + i * 2) * 0.06) * boost;
       f.scale.set(b.r * 2 * (2 - k) * 0.9 + b.r * 0.2, b.h * k, b.r * 2 * (2 - k) * 0.9 + b.r * 0.2);
       f.rotation.y = t * (1 + i);
     });

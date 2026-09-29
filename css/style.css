@@ -222,6 +222,9 @@ html, body {
 .marker.edge { animation: none; font-size: 0; width: 34px; height: 34px; border-radius: 50%; background: #ff7b3a; box-shadow: 0 3px 0 #c85418; }
 @keyframes hop { to { margin-top: -10px; } }
 .float.coin { color: #ffd84a; }
+.float.heal { color: #9ff07a; }
+.st-label.burn { border-color: #f0a070; font-size: 12px; }
+.st-label.store { border-color: #e0a090; flex-wrap: wrap; max-width: 220px; justify-content: center; }
 
 /* メニュー */
 .sheet-upgrade, .sheet-smithy, .sheet-hire, .sheet-clear, .sheet-away { max-height: 86vh; overflow-y: auto; }

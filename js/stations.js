@@ -2,7 +2,7 @@
 import * as THREE from './lib/three.module.min.js';
 import { scene } from './gfx.js';
 import { tileModel } from './models.js';
-import { MATERIALS, SHOP } from './data.js';
+import { MATERIALS, SHOP, STORAGE } from './data.js';
 import { S } from './state.js';
 import { pileSpot } from './items.js';
 import { burst, floatText } from './fx.js';
@@ -14,6 +14,8 @@ const SHIRTS = [0xf28b50, 0x5fb3e8, 0xe86a8a, 0x8bd16a, 0xf5c542, 0xa98bf0, 0x6f
 const ang = [0, 0, 0, 0, 0, 0, 0, 0];
 const near = (a, x, z, h) => Math.abs(a.x - x) < h && Math.abs(a.z - z) < h;
 const SELL = Object.keys(MATERIALS).filter(k => MATERIALS[k].price);
+// 遠くから飛ぶときは少し長く
+const flyDur = (it, to) => 0.3 + Math.min(0.5, Math.hypot(it.p.x - to.x, it.p.z - to.z) * 0.025);
 
 export class Stations {
   constructor(ch, builds, items, coins) {
@@ -52,7 +54,39 @@ export class Stations {
         scene.add(tile.group);
         this.anvil = { site, tile, pos, inside: false };
       }
+      if (d.storage) {
+        const tile = tileModel({ size: 1.8, mark: 'none', plate: 0xf3d9d2, border: 0xa8452f });
+        const pos = { x: d.x + d.storage[0], z: d.z + d.storage[1] };
+        tile.group.position.set(pos.x, 0, pos.z);
+        scene.add(tile.group);
+        this.storage = { site, tile, pos, door: { x: d.x, z: d.z + d.d / 2 + 0.2 }, depT: 0, inflight: 0 };
+      }
     }
+    // 焚き火にくべるマス（最初からある）
+    const bt = tileModel({ size: 1.5, mark: 'none', plate: 0xffd9b0, border: 0xd9642a });
+    bt.group.position.set(ch.burn[0], 0, ch.burn[1]);
+    scene.add(bt.group);
+    this.burn = { tile: bt, pos: { x: ch.burn[0], z: ch.burn[1] }, fire: { x: ch.campfire[0], z: ch.campfire[1] }, hold: 0, depT: 0, told: false };
+  }
+
+  // ---- 倉庫 ----
+  storageReady() { return !!(this.storage && this.storage.site.done); }
+  storageCount(kind) { return this.storageReady() ? (S.storage[kind] || 0) : 0; }
+  storageTotal() { return Object.values(S.storage).reduce((a, b) => a + b, 0); }
+  // 倉庫から条件に合う素材を1つ出す（倉庫の扉から飛んでいく素材を返す）
+  fromStorage(pred) {
+    if (!this.storageReady()) return null;
+    const kind = Object.keys(S.storage).find(k => S.storage[k] > 0 && pred(k));
+    if (!kind) return null;
+    S.storage[kind]--;
+    const d = this.storage.door;
+    return this.items.make(kind, d.x, 1.0, d.z);
+  }
+  // 背中の素材を n 個使う。足りない分は倉庫から
+  useMaterial(c, kind, n) {
+    const inBag = Math.min(n, this.items.count(c, kind));
+    this.items.consume(c, kind, inBag);
+    if (n > inBag) S.storage[kind] = Math.max(0, (S.storage[kind] || 0) - (n - inBag));
   }
 
   st(p) { return S.stations[p.id] || (S.stations[p.id] = { in: 0, out: 0, t: 0 }); }
@@ -63,10 +97,10 @@ export class Stations {
   feedOne(p, c, player, hooks) {
     const st = this.st(p);
     if (st.in + p.inflight >= p.def.inCap) return false;
-    const it = this.items.take(c, k => k === p.from);
+    const it = this.items.take(c, k => k === p.from) || (c === player ? this.fromStorage(k => k === p.from) : null);
     if (!it) return false;
     p.inflight++;
-    this.items.flyTo(it, p.inPos.x + (Math.random() - 0.5) * 0.5, 0.3, p.inPos.z + (Math.random() - 0.5) * 0.5, 0.3, () => {
+    this.items.flyTo(it, p.inPos.x + (Math.random() - 0.5) * 0.5, 0.3, p.inPos.z + (Math.random() - 0.5) * 0.5, flyDur(it, p.inPos), () => {
       p.inflight--; st.in++;
       if (c === player) { sfx.deposit(st.in); hooks.onFeed(p.from); }
     });
@@ -84,12 +118,12 @@ export class Stations {
   stockOne(c, player, hooks) {
     const sh = this.shop;
     if (this.stockTotal() + sh.inflight >= SHOP.stockCap) return false;
-    const it = this.items.take(c, k => !!MATERIALS[k].price);
+    const it = this.items.take(c, k => !!MATERIALS[k].price) || (c === player ? this.fromStorage(k => !!MATERIALS[k].price) : null);
     if (!it) return false;
     const kind = it.kind;
     sh.inflight++;
     this.counterSpot(this.stockTotal() + sh.inflight - 1, kind, _v);
-    this.items.flyTo(it, _v.x, _v.y, _v.z, 0.3, () => {
+    this.items.flyTo(it, _v.x, _v.y, _v.z, flyDur(it, _v), () => {
       sh.inflight--; S.shop.stock[kind] = (S.shop.stock[kind] || 0) + 1;
       if (c === player) { sfx.deposit(this.stockTotal()); hooks.onStock(); }
     });
@@ -149,7 +183,53 @@ export class Stations {
         a.inside = inside;
       }
     }
+    if (!drawOnly) { this.updateBurn(dt, time, player, hooks); this.updateStorage(dt, time, player, hooks); }
     this.updateShop(dt, time, player, hooks);
+  }
+
+  // 焚き火にくべる：少し立っていると、今使わない素材から燃やす
+  updateBurn(dt, time, player, hooks) {
+    const b = this.burn;
+    const on = player.alive && near(player.pos, b.pos.x, b.pos.z, 0.8);
+    b.tile.inner.material.opacity = on ? 0.35 + Math.min(1, b.hold / 0.6) * 0.4 : 0.25 + Math.sin(time * 3) * 0.06;
+    if (!on) { b.hold = 0; b.depT = 0; b.told = false; return; }
+    b.hold += dt;
+    if (b.hold < 0.6) return;
+    const need = hooks.neededKinds();
+    b.depT -= dt;
+    while (b.depT <= 0) {
+      b.depT += 0.06;
+      const it = this.items.take(player, k => !need.has(k));
+      if (!it) {
+        if (!b.told && player.bag.length) { b.told = true; hooks.onBurnNone(); }
+        b.depT = 0; break;
+      }
+      this.items.flyTo(it, b.fire.x, 0.5, b.fire.z, 0.35, () => {
+        burst(b.fire.x, 0.7, b.fire.z, { n: 5, colors: [0xff7a2a, 0xffb23a, 0xffe46a, 0x555555], speed: 1.5, up: 4, size: 0.12, life: 0.6, g: -2, floor: false });
+        hooks.onBurn();
+      });
+    }
+  }
+
+  // 倉庫：マスに立つと背中の素材をぜんぶ預ける
+  updateStorage(dt, time, player, hooks) {
+    const st = this.storage;
+    if (!st) return;
+    st.tile.group.visible = st.site.done;
+    if (!st.site.done) return;
+    const on = player.alive && near(player.pos, st.pos.x, st.pos.z, 0.95);
+    st.tile.inner.material.opacity = on ? 0.55 + Math.sin(time * 10) * 0.15 : 0.3;
+    if (!on) { st.depT = 0; return; }
+    st.depT -= dt;
+    while (st.depT <= 0) {
+      st.depT += 0.05;
+      if (this.storageTotal() + st.inflight >= STORAGE.cap) { hooks.onStorageFull(); st.depT = 0; break; }
+      const it = this.items.take(player, () => true);
+      if (!it) { st.depT = 0; break; }
+      const kind = it.kind;
+      st.inflight++;
+      this.items.flyTo(it, st.door.x, 0.6, st.door.z, 0.3, () => { st.inflight--; S.storage[kind] = (S.storage[kind] || 0) + 1; sfx.deposit(this.storageTotal()); });
+    }
   }
 
   updateShop(dt, time, player, hooks) {
