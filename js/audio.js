@@ -74,4 +74,22 @@ export const sfx = {
   pop() { tone(620, 0.12, { v: 0.16, to: 1240 }); },
   swap() { tone(1200, 0.03, { type: 'square', v: 0.03 }); },
   appear() { [784, 988, 1175].forEach((f, i) => tone(f, 0.12, { type: 'triangle', v: 0.1, at: i * 0.07 })); },
+  chopSoft() { noise(0.06, { v: 0.12, type: 'lowpass', f: 1000 }); tone(150, 0.08, { type: 'triangle', v: 0.12, to: 80 }); },
+  rockSoft() { tone(1500, 0.08, { type: 'triangle', v: 0.05, to: 1250 }); noise(0.04, { v: 0.08, type: 'highpass', f: 2600 }); },
+  coin() {
+    const now = performance.now(); if (now - lastCoin < 45) return; lastCoin = now;
+    tone(1319, 0.06, { type: 'square', v: 0.045 }); tone(1976, 0.12, { type: 'square', v: 0.04, at: 0.05 });
+  },
+  sell() { tone(988, 0.07, { type: 'triangle', v: 0.1 }); tone(1319, 0.12, { type: 'triangle', v: 0.1, at: 0.07 }); },
+  mission() { [659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.16, { type: 'triangle', v: 0.13, at: i * 0.08 })); },
+  unlock() { [523, 784, 1047].forEach((f, i) => tone(f, 0.3, { type: 'triangle', v: 0.14, at: i * 0.12 })); tone(1568, 0.5, { v: 0.08, at: 0.36 }); },
+  upgrade() { tone(440, 0.1, { type: 'square', v: 0.06, to: 880 }); [880, 1109, 1319].forEach((f, i) => tone(f, 0.14, { type: 'triangle', v: 0.12, at: 0.1 + i * 0.06 })); },
+  anvil() { tone(1800, 0.25, { type: 'triangle', v: 0.12, to: 1700 }); tone(2700, 0.2, { v: 0.06 }); noise(0.05, { v: 0.2, type: 'highpass', f: 3000 }); },
+  roar() { tone(90, 0.7, { type: 'sawtooth', v: 0.12, to: 60 }); noise(0.6, { v: 0.15, type: 'lowpass', f: 500, to: 200 }); },
+  slam() { tone(70, 0.4, { type: 'triangle', v: 0.4, to: 35 }); noise(0.35, { v: 0.35, type: 'lowpass', f: 700, to: 150 }); },
+  fanfare() {
+    const seq = [[523, 0], [659, 0.15], [784, 0.3], [1047, 0.45], [988, 0.75], [1047, 0.9], [1319, 1.05]];
+    seq.forEach(([f, at]) => { tone(f, 0.28, { type: 'triangle', v: 0.16, at }); tone(f / 2, 0.28, { type: 'sine', v: 0.08, at }); });
+  },
 };
+let lastCoin = 0;

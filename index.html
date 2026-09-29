@@ -9,32 +9,52 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap">
-<link rel="stylesheet" href="css/style.css?v=1">
+<link rel="stylesheet" href="css/style.css?v=2">
 </head>
 <body>
 <div id="app">
   <div id="stage"></div>
-  <div id="labels">
-    <div id="tileLabel" class="tile-label" hidden></div>
-    <div id="fullBubble" class="full-bubble" hidden></div>
-  </div>
+  <div id="labels"></div>
   <div id="vignette"></div>
 
   <header class="hud">
     <div class="hud-row">
-      <div id="hpPill" class="pill hp"><img id="hpIco" class="ico" alt=""><div class="hpbar"><b id="hpFill"></b></div><span id="hpNum" class="num">10</span></div>
-      <div id="bagPill" class="pill bag"><img id="bagIco" class="ico" alt=""><span id="bagNum" class="num">0/10</span></div>
+      <div id="hpPill" class="pill hp" hidden><img id="hpIco" class="ico" alt=""><div class="hpbar"><b id="hpFill"></b></div><span id="hpNum" class="num">10</span></div>
+      <div id="bagPill" class="pill bag" hidden><img id="bagIco" class="ico" alt=""><span id="bagNum" class="num">0/10</span></div>
+      <div id="coinPill" class="pill coin" hidden><img id="coinIco" class="ico" alt=""><span id="coinNum" class="num">0</span></div>
       <span class="grow"></span>
-      <button id="btnGear" class="hud-btn" type="button" aria-label="設定 / Settings">⚙</button>
+      <button id="btnGear" class="hud-btn" type="button" aria-label="設定 / Settings" hidden>⚙</button>
     </div>
-    <div id="mission" class="mission"><span id="missionText"></span></div>
+    <div id="rankRow" class="rank-row" hidden>
+      <span class="pill small"><img id="rankIco" class="ico" alt=""><span id="rankText"></span></span>
+      <span class="pill small"><img id="popIco" class="ico" alt=""><span id="popNum" class="num">0</span></span>
+    </div>
+    <div id="mission" class="mission" hidden><span id="missionText"></span></div>
+    <div id="bossBar" class="boss-bar" hidden><span id="bossName"></span><div class="bb"><b id="bossFill"></b></div></div>
     <div id="toasts" class="toasts" aria-live="polite"></div>
   </header>
 
-  <div id="moveHint" class="move-hint"><i class="hand"></i><span></span></div>
+  <div class="side-btns">
+    <button id="btnUpgrade" class="big-btn" type="button" hidden><img id="upIco" alt=""><span id="upLbl"></span><i class="dot"></i></button>
+    <button id="btnHire" class="big-btn" type="button" hidden><img id="hireIco" alt=""><span id="hireLbl"></span><i class="dot"></i></button>
+  </div>
+
+  <div id="moveHint" class="move-hint gone"><i class="hand"></i><span></span></div>
   <div id="joy" hidden><div id="joyKnob"></div></div>
   <div id="fade"></div>
   <div id="fps" class="fps" hidden></div>
+
+  <div id="sheetModal" class="modal" hidden><div id="sheet" class="sheet"></div></div>
+
+  <div id="title" class="modal title-screen" hidden>
+    <div class="title-box">
+      <div class="logo-fire" aria-hidden="true"><i></i><i></i><i></i></div>
+      <h1 id="titleLogo"></h1>
+      <p id="titleSub" class="title-sub"></p>
+      <button id="btnStart" type="button" class="start-btn"></button>
+      <div id="debugBox" class="debug-box" hidden></div>
+    </div>
+  </div>
 
   <div id="settings" class="modal" hidden>
     <div class="sheet" role="dialog" aria-labelledby="setTitle">
@@ -54,6 +74,7 @@
         </div>
       </div>
       <p id="qInfo" class="q-info"></p>
+      <button type="button" id="btnAway" hidden></button>
       <div class="set-row col">
         <button type="button" id="btnReset" class="danger"></button>
         <div id="resetAsk" class="reset-ask" hidden>
@@ -68,6 +89,6 @@
     </div>
   </div>
 </div>
-<script type="module" src="js/main.js?v=1"></script>
+<script type="module" src="js/main.js?v=2"></script>
 </body>
 </html>

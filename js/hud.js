@@ -1,17 +1,42 @@
-// 画面の表示：HP・背中の数・次にやること・お知らせ・建設マスの札・設定
+// 画面の表示：HP・背中の数・コイン・王国ランク・ミッション・お知らせ・3Dの上に出す札
 import { t } from './i18n.js';
-import { icon, iconImg } from './icons.js';
+import { icon } from './icons.js';
 import { toScreen, view } from './gfx.js';
 
 const $ = id => document.getElementById(id);
-const _sp = { x: 0, y: 0, on: false };
+const _sp = { x: 0, y: 0, on: false, behind: false };
+const bump = el => { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); };
+
+// 解放されるまで隠しておく表示
+const GATED = { hpPill: 'hp', bagPill: 'bag', coinPill: 'coins', rankRow: 'rank', btnGear: 'gear', btnUpgrade: 'upgrade', btnHire: 'hire' };
 
 export const hud = {
+  last: {},
+  labels: new Map(),
+
   init() {
     $('hpIco').src = icon('heart');
     $('bagIco').src = icon('bag');
-    this.last = {};
+    $('coinIco').src = icon('coin');
+    $('rankIco').src = icon('crown');
+    $('popIco').src = icon('people');
+    $('upIco').src = icon('hammer');
+    $('hireIco').src = icon('people');
+    this.shown = {};
   },
+
+  // 解放されたものを出す（初めて出るときはポンと出る）
+  gates(unlocked, animate) {
+    for (const id in GATED) {
+      const on = !!unlocked[GATED[id]];
+      const el = $(id);
+      if (on === !!this.shown[id]) continue;
+      this.shown[id] = on;
+      el.hidden = !on;
+      if (on && animate) { el.classList.remove('pop-in'); void el.offsetWidth; el.classList.add('pop-in'); }
+    }
+  },
+  newDot(id, on) { $(id).classList.toggle('has-new', on); },
 
   hp(hp, max) {
     const v = Math.ceil(hp);
@@ -28,66 +53,91 @@ export const hud = {
     const up = this.last.bagN !== undefined && n > this.last.bagN;
     this.last.bag = k; this.last.bagN = n;
     $('bagNum').textContent = k;
-    const el = $('bagPill');
-    el.classList.toggle('full', n >= cap);
-    if (up) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+    $('bagPill').classList.toggle('full', n >= cap);
+    if (up) bump($('bagPill'));
   },
 
-  mission(html) {
+  coins(n) {
+    if (this.last.coins === n) return;
+    const up = this.last.coins !== undefined && n > this.last.coins;
+    this.last.coins = n;
+    $('coinNum').textContent = n.toLocaleString();
+    if (up) bump($('coinPill'));
+  },
+
+  rank(rank, name, pop) {
+    const k = rank + name + pop;
+    if (this.last.rank === k) return;
+    const up = this.last.rankN !== undefined && rank > this.last.rankN;
+    this.last.rank = k; this.last.rankN = rank;
+    $('rankText').textContent = `${t('rank', { n: rank })}・${name}`;
+    $('popNum').textContent = pop;
+    if (up) bump($('rankRow'));
+  },
+
+  mission(text, prog, reward) {
+    const html = `<span class="m-text">${text}</span>` + (prog ? `<span class="m-prog">${prog.p}/${prog.n}</span>` : '') + (reward ? `<span class="m-reward"><img class="ico" src="${icon('coin')}" alt="">+${reward}</span>` : '');
     if (this.last.mission === html) return;
     this.last.mission = html;
     const el = $('mission');
     $('missionText').innerHTML = html;
-    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+    if (!this.last.missionText || this.last.missionText !== text) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+    this.last.missionText = text;
   },
 
   toast(html, kind = '') {
+    const box = $('toasts');
+    while (box.children.length > 3) box.firstChild.remove();
     const el = document.createElement('div');
     el.className = 'toast ' + kind;
     el.innerHTML = html;
-    $('toasts').appendChild(el);
-    setTimeout(() => el.classList.add('out'), 2200);
-    setTimeout(() => el.remove(), 2700);
+    box.appendChild(el);
+    setTimeout(() => el.classList.add('out'), 2300);
+    setTimeout(() => el.remove(), 2800);
   },
 
-  // 建設マスの札。画面の外なら端に矢印つきで出す
-  tileLabel(site, builds, wx, wz) {
-    const el = $('tileLabel');
-    if (!site) { el.hidden = true; return; }
+  bossBar(name, frac) {
+    const el = $('bossBar');
+    if (frac === null) { el.hidden = true; return; }
     el.hidden = false;
-    const key = site.def.id + JSON.stringify(site.paid) + JSON.stringify(site.inflight) + t('title');
-    if (this.last.tile !== key) {
-      this.last.tile = key;
-      const chips = Object.keys(site.def.cost).map(k => {
-        const n = Math.max(0, builds.need(site, k));
-        return `<span class="chip${n === 0 ? ' ok' : ''}">${iconImg(k)}<b>${n === 0 ? '✓' : n}</b></span>`;
-      }).join('');
-      el.innerHTML = `<div class="tl-name">${t('repairOf', { b: t('b_' + site.def.model) })}</div><div class="tl-chips">${chips}</div><i class="tl-arrow"></i>`;
+    $('bossName').textContent = name;
+    $('bossFill').style.width = Math.max(0, frac * 100) + '%';
+  },
+
+  // ---- 3Dの上に出す札 ----
+  labelsBegin() { this.used = new Set(); },
+  // edge = 画面の外なら端に矢印つきで出す
+  label(key, html, wx, wy, wz, cls = '', edge = false) {
+    let L = this.labels.get(key);
+    if (!L) {
+      const el = document.createElement('div');
+      el.className = 'wlabel ' + cls;
+      $('labels').appendChild(el);
+      L = { el, html: null };
+      this.labels.set(key, L);
     }
-    toScreen(wx, 0.3, wz, _sp);
-    const m = 56, top = 130;
+    this.used.add(key);
+    if (L.html !== html) { L.html = html; L.el.innerHTML = html + (edge ? '<i class="tl-arrow"></i>' : ''); }
+    toScreen(wx, wy, wz, _sp);
     let x = _sp.x, y = _sp.y;
+    const m = 56, top = 150;
     const off = !_sp.on || x < m || x > view.w - m || y < top || y > view.h - 40;
-    el.classList.toggle('edge', off);
+    if (off && !edge) { L.el.style.visibility = 'hidden'; return; }
+    L.el.style.visibility = '';
+    L.el.classList.toggle('edge', off);
     if (off) {
       const cx = view.w / 2, cy = view.h / 2;
       let dx = x - cx, dy = y - cy;
       if (_sp.behind) { dx = -dx; dy = -dy; }
-      const sx = (view.w / 2 - m) / Math.abs(dx || 1e-3), sy = ((dy < 0 ? cy - top : view.h - cy - 60)) / Math.abs(dy || 1e-3);
+      const sx = (view.w / 2 - m) / Math.abs(dx || 1e-3), sy = (dy < 0 ? cy - top : view.h - cy - 70) / Math.abs(dy || 1e-3);
       const s = Math.min(sx, sy);
       x = cx + dx * s; y = cy + dy * s;
-      el.style.setProperty('--ang', Math.atan2(dy, dx) + 'rad');
+      L.el.style.setProperty('--ang', Math.atan2(dy, dx) + 'rad');
     }
-    el.style.transform = `translate(${x}px,${y}px)`;
+    L.el.style.transform = `translate(${x}px,${y}px)`;
   },
-
-  fullBubble(show, wx, wy, wz) {
-    const el = $('fullBubble');
-    if (!show) { el.hidden = true; return; }
-    el.hidden = false;
-    el.textContent = t('full');
-    toScreen(wx, wy, wz, _sp);
-    el.style.transform = `translate(${_sp.x}px,${_sp.y}px)`;
+  labelsEnd() {
+    for (const [k, L] of this.labels) if (!this.used.has(k)) { L.el.remove(); this.labels.delete(k); }
   },
 
   moveHint(show) { $('moveHint').classList.toggle('gone', !show); },
@@ -97,14 +147,8 @@ export const hud = {
 
   texts() {
     $('moveHint').querySelector('span').textContent = t('moveHint');
-    $('setTitle').textContent = t('settings');
-    $('lblSound').textContent = t('sound');
-    $('sOn').textContent = t('on'); $('sOff').textContent = t('off');
-    $('lblLang').textContent = t('language');
-    $('btnReset').textContent = t('reset');
-    $('resetMsg').textContent = t('resetAsk');
-    $('btnResetYes').textContent = t('yes'); $('btnResetNo').textContent = t('cancel');
-    $('btnClose').textContent = t('close');
+    $('upLbl').textContent = t('btnUpgrade');
+    $('hireLbl').textContent = t('btnHire');
     this.last = {};
   },
 };

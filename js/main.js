@@ -1,87 +1,116 @@
 // 焚き火から王国へ — 全体のつなぎ込みと毎フレームの処理
 import * as THREE from './lib/three.module.min.js';
 import { renderer, scene, camera, resize, placeCamera, perfTick, perfReset, perf, quality, Blobs, params } from './gfx.js';
-import { CHAPTERS, MATERIALS } from './data.js';
+import { CHAPTERS, MATERIALS, UPGRADES, TOOLS, JOBS, SHOP } from './data.js';
+import { S, stat, loadState, resetState, rankScore, rankOf } from './state.js';
 import { World } from './world.js';
 import { Resources } from './resources.js';
 import { Items } from './items.js';
+import { Coins } from './coins.js';
 import { Enemies } from './enemies.js';
 import { Player } from './player.js';
 import { Builds } from './build.js';
+import { Stations } from './stations.js';
+import { Workers } from './workers.js';
+import { Missions } from './missions.js';
 import { Rig } from './rig.js';
 import { villagerParts } from './models.js';
 import { burst, ring, shake, shakeState, floatText, updateFx } from './fx.js';
 import { sfx, unlock, setSound, soundOn } from './audio.js';
 import { readMove, onFirstTouch, input } from './input.js';
 import { hud } from './hud.js';
-import { t, setLang, i18n } from './i18n.js';
+import { ui } from './ui.js';
+import { t, setLang, i18n, fmtTime } from './i18n.js';
 import { iconImg } from './icons.js';
 import { loadSave, writeSave, eraseSave } from './save.js';
-import { PLAYER } from './data.js';
 
 const $ = id => document.getElementById(id);
-const CH = 1;
-const ch = CHAPTERS[CH];
+const DEBUG = params.get('debug') === '1';
+const SLOT = DEBUG ? 'debug' : 'main';
+const GAME_URL = 'https://tanukibox.github.io/CAMPFIRE-TO-KINGDOM/';
+const ch = CHAPTERS[1];
 
 // ---- セーブの読み込みと設定 ----
-const save = loadSave() || {};
+const save = loadSave(SLOT) || {};
+const hasSave = save.v === 2;
 const settings = { sound: true, lang: null, ...(save.settings || {}) };
-if (settings.lang) setLang(settings.lang); else setLang(i18n.lang);
+setLang(settings.lang || i18n.lang);
 setSound(settings.sound);
+if (hasSave) loadState(save.state);
 
 // ---- 世界をつくる ----
 resize();
 const world = new World(ch);
+world.setOwned(S.lands);
 const resources = new Resources(ch, world);
 const player = new Player();
-const items = new Items(PLAYER.bagCap);
+const items = new Items();
+items.addCarrier(player);
+const coins = new Coins();
 const enemies = new Enemies(ch, world);
 const builds = new Builds(ch, world);
+if (hasSave) builds.load(save.builds);
+const stations = new Stations(ch, builds, items, coins);
+const workers = new Workers(world, builds, resources, stations, items);
+const missions = new Missions(ch.missions);
 world.decorate(builds.areas());
-const blobs = new Blobs(420);
+const blobs = new Blobs(520);
+const people = new Rig(villagerParts(), 160);
+if (S.bossDead && enemies.boss) enemies.boss.alive = false;
 
-let playTime = save.time || 0;
-let gathered = !!save.gathered;
-builds.load(save.builds);
 player.pos.set(ch.start[0], 0, ch.start[1]);
-if (typeof save.px === 'number') { player.pos.set(save.px, 0, save.pz); world.resolve(player.pos, 0.36); }
-if (typeof save.hp === 'number' && save.hp > 0) player.hp = Math.min(player.maxHp, save.hp);
+if (hasSave && typeof save.px === 'number') { player.pos.set(save.px, 0, save.pz); world.resolve(player.pos, 0.36); }
+player.applyStats();
+if (hasSave && save.hp > 0) player.hp = Math.min(player.maxHp, save.hp);
 player.animate(0);
-(save.bag || []).forEach(k => { if (MATERIALS[k]) items.addToBag(k, player); });
+if (hasSave) (save.bag || []).forEach(k => { if (MATERIALS[k] && player.bag.length < player.cap) items.put(player, k); });
+workers.sync(player, true);
 
-// ---- 負荷確認用：?stress=150 で住民とスライムをたくさん歩かせる ----
-const stressN = Math.min(400, parseInt(params.get('stress') || '0', 10) || 0);
-let villagers = null;
-if (stressN > 0) {
-  const f = ch.fence, zone = { x: (f.x0 + f.x1) / 2, z: (f.z0 + f.z1) / 2, r: 12 };
-  for (let i = 0; i < Math.floor(stressN / 2); i++) enemies.spawn('slime', zone, { passive: true, color: new THREE.Color().setHSL(Math.random(), 0.6, 0.6).getHex() });
-  villagers = makeVillagers(stressN - Math.floor(stressN / 2), zone);
+// ---- 計算する値 ----
+const rankNow = () => rankOf(rankScore(builds.population(), builds.buildingsDone()));
+const chapterName = () => t(S.cleared[1] ? ch.name.after : ch.name.before);
+function lushNow() {
+  if (S.cleared[1]) return 1;
+  const total = builds.sites.filter(s => s.def.model).length;
+  return Math.min(0.95, 0.1 + 0.7 * builds.buildingsDone() / total + 0.05 * (S.lands.length - 1));
 }
-const showFps = stressN > 0 || params.has('fps');
-// 動作確認用（?debug=1 のときだけ）。章選び・素材大量スタートは区切り2で追加
-if (params.get('debug') === '1') window.ctk = { player, items, builds, resources, enemies, world };
+world.setLush(lushNow());
+
+function unlockThing(key, toastKey) {
+  if (S.unlocked[key]) return;
+  S.unlocked[key] = true;
+  hud.gates(S.unlocked, true);
+  if (toastKey) { hud.toast(`✨ ${t(toastKey)}`, 'good'); sfx.unlock(); }
+  if (key === 'upgrade' || key === 'hire') hud.newDot(key === 'upgrade' ? 'btnUpgrade' : 'btnHire', true);
+}
+
+function addCoins(n, x, y, z) {
+  S.coins += n; S.earned += n;
+  missions.event('earn', null, n);
+  sfx.coin();
+  unlockThing('coins');
+  if (x !== undefined) floatText('+' + n, x, y, z, 'coin');
+}
 
 // ---- できごと ----
-let fullT = 0, fullSfx = 0;
+let fullT = 0, fullSfx = 0, dirty = false, clearT = -1;
 
 player.hooks = {
   onSwap() { sfx.swap(); },
   onHit(kind, target) {
     const px = player.pos.x, pz = player.pos.z;
     if (kind === 'enemy') {
-      const killed = enemies.hit(target, player.dmg, px, pz);
+      unlockThing('hp');
+      const dmg = stat.dmg();
+      const killed = enemies.hit(target, dmg, px, pz);
       sfx.slash(); shake(0.12);
-      burst(target.x, 0.55, target.z, { n: 7, colors: [0xffffff, 0xfff3a0], speed: 5, up: 1.5, size: 0.09, life: 0.25, g: 0, floor: false });
-      burst(target.x, 0.45, target.z, { n: 5, color: target.color.getHex(), speed: 2.5, up: 4, size: 0.12, life: 0.5 });
-      floatText(String(player.dmg), target.x, 1.2, target.z, 'dmg');
-      if (killed) {
-        sfx.kill(); shake(0.2);
-        burst(target.x, 0.4, target.z, { n: 18, color: target.color.getHex(), speed: 4, up: 5, size: 0.16, life: 0.7 });
-        ring(target.x, target.z, 0xffffff, 1.6, 0.35);
-        for (const k in target.def.drop) popDrops(k, target.def.drop[k], target.x, target.z, 0.5);
-      }
+      const hy = 0.55 * target.def.size + (target.hopY || 0);
+      burst(target.x, hy, target.z, { n: 7, colors: [0xffffff, 0xfff3a0], speed: 5, up: 1.5, size: 0.09, life: 0.25, g: 0, floor: false });
+      burst(target.x, hy, target.z, { n: 5, color: target.color.getHex(), speed: 2.5, up: 4, size: 0.12, life: 0.5 });
+      floatText(String(dmg), target.x, hy + 0.7, target.z, 'dmg');
+      if (killed) onKill(target);
     } else {
-      const n = resources.hit(target, px, pz);
+      const n = resources.hit(target, px, pz, stat.power(target.def.tool));
       const dir = { x: target.dx, z: target.dz };
       if (target.type === 'tree') {
         sfx.chop();
@@ -103,13 +132,15 @@ player.hooks = {
     }
   },
   onHurt(n) {
+    unlockThing('hp');
     sfx.hurt(); shake(0.25); hud.hurt();
     floatText('-' + n, player.pos.x, 1.6, player.pos.z, 'hurt');
   },
   onDown() {
     sfx.down(); shake(0.35);
-    const x = player.pos.x, z = player.pos.z;
-    const n = items.dropHalf(x, z);
+    const n = items.dropHalf(player);
+    enemies.resetBoss();
+    hud.bossBar(null, null);
     setTimeout(() => hud.fade(true), 700);
     setTimeout(() => {
       player.respawn(ch.start[0], ch.start[1]);
@@ -123,6 +154,23 @@ player.hooks = {
   },
 };
 
+function onKill(e) {
+  const def = e.def;
+  sfx.kill(); shake(def.boss ? 0.6 : 0.2);
+  const y = 0.4 * def.size;
+  burst(e.x, y, e.z, { n: def.boss ? 60 : 18, color: e.color.getHex(), speed: def.boss ? 7 : 4, up: 5, size: def.boss ? 0.3 : 0.16, life: 0.9 });
+  ring(e.x, e.z, 0xffffff, def.boss ? 6 : 1.6, 0.4);
+  if (!e.minion) for (const k in def.drop) popDrops(k, def.drop[k], e.x, e.z, 0.5 + y);
+  missions.event('kill', e.type);
+  S.stats.kills++;
+  if (def.boss) {
+    S.bossDead = true;
+    hud.bossBar(null, null);
+    for (let i = enemies.list.length - 1; i >= 0; i--) if (enemies.list[i].minion) { const m = enemies.list[i]; burst(m.x, 0.4, m.z, { n: 10, color: m.color.getHex(), speed: 3, up: 4, size: 0.14, life: 0.6 }); enemies.list.splice(i, 1); }
+    saveNow();
+  }
+}
+
 function popDrops(kind, n, x, z, y) {
   const base = Math.atan2(player.pos.z - z, player.pos.x - x);
   for (let i = 0; i < n; i++) {
@@ -132,7 +180,7 @@ function popDrops(kind, n, x, z, y) {
 }
 
 const itemHooks = {
-  onPick(it, n) { sfx.pickup(n); gathered = true; dirty = true; },
+  onPick(it, n) { sfx.pickup(n); unlockThing('bag'); missions.event('gather', it.kind); dirty = true; },
   onStack(it) { burst(it.p.x, it.p.y, it.p.z, { n: 2, color: 0xffffff, speed: 1, up: 1, size: 0.06, life: 0.2, g: 0, floor: false }); },
   onFull() { fullT = 1.2; },
   clamp(p) { world.resolve(p, 0.15); },
@@ -141,50 +189,239 @@ const itemHooks = {
 const buildHooks = {
   onPaid() { dirty = true; },
   onBuilt(site) {
-    dirty = true;
-    hud.toast(`🔨 ${t('repaired', { b: t('b_' + site.def.model) })}`, 'good');
+    const d = site.def;
+    if (d.type === 'land') {
+      S.lands.push(d.land);
+      world.setOwned(S.lands);
+      hud.toast(`🚩 ${t('landOpen', { l: t('l_' + d.land) })}`, 'good');
+      sfx.fanfare();
+    } else {
+      hud.toast(`🔨 ${t(d.type === 'repair' ? 'repaired' : 'built', { b: t('b_' + d.model) })}`, 'good');
+      if (d.pop) { const before = workers.list.length; workers.sync(player); const n = workers.list.length - before; if (n) setTimeout(() => hud.toast(`${iconImg('people')} ${t('newPeople', { n })}`), 900); }
+    }
+    world.setLush(lushNow());
     saveNow();
   },
   onNewTile() { hud.toast(t('newTile')); },
 };
 
-// ---- 次にやること ----
-function missionHtml() {
-  const s = builds.current();
-  if (!s) return builds.nextDelay > 0 ? null : `⭐ ${t('m_done')}`;
-  const needK = Object.keys(s.def.cost).filter(k => builds.left(s, k) > 0);
-  if (!gathered) return `${iconImg('wood')} ${t('m_chop')}`;
-  if (items.bag.some(it => needK.includes(it.kind))) return `🔨 ${t('m_carry')}`;
-  const list = needK.map(k => `${iconImg(k)}${t('m_left', { n: builds.left(s, k) })}`).join(' ');
-  return list ? t('m_need', { b: t('b_' + s.def.model), list }) : `🔨 ${t('m_carry')}`;
+const stationHooks = {
+  onFeed(kind) { missions.event('feed', kind); dirty = true; },
+  onTake(kind) { missions.event('take', kind); unlockThing('bag'); dirty = true; },
+  onStock() { missions.event('stock'); dirty = true; },
+  onMake(kind) { missions.event('make', kind); },
+  onFull() { fullT = 1.2; },
+  onAnvil() { openSmithy(); },
+  keeper: () => workers.keeper(),
+  onCoin(n, auto) {
+    const k = workers.keeper();
+    if (auto && k) addCoins(n, k.x, 2, k.z); else addCoins(n);
+    dirty = true;
+  },
+  onSell() { dirty = true; },
+};
+
+// ぬし
+const warn = new THREE.Mesh(new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xff4a3a, transparent: true, opacity: 0.35, depthWrite: false }));
+warn.visible = false; warn.renderOrder = 2; scene.add(warn);
+const bossHooks = {
+  onBossStart(e) { sfx.roar(); shake(0.4); hud.toast(`⚠ ${t('bossAppear')}`, 'bad'); },
+  onBossEnd() { hud.bossBar(null, null); },
+  onBossLeap(e) { warn.visible = true; warn.position.set(e.lx, 0.06, e.lz); warn.userData.t = 0; warn.userData.r = e.def.slamR; },
+  onBossSlam(e) {
+    warn.visible = false;
+    sfx.slam(); shake(0.55);
+    ring(e.x, e.z, 0xe2c38f, e.def.slamR * 1.2, 0.5);
+    burst(e.x, 0.3, e.z, { n: 24, colors: [0xe2c38f, 0xc9a877, 0x8be36a], speed: 6, up: 3, size: 0.2, life: 0.7 });
+  },
+  onBossCall(e) {
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * 6.28, x = e.x + Math.cos(a) * 2.5, z = e.z + Math.sin(a) * 2.5;
+      const m = enemies.spawn('slime', { x, z, r: 1 }, { minion: true, x, z });
+      burst(x, 0.4, z, { n: 8, color: 0x8be36a, speed: 2, up: 3, size: 0.12, life: 0.5 });
+      m.cd = 1;
+    }
+  },
+};
+
+// ---- メニューから呼ばれること ----
+const game = {
+  bagCount: k => items.count(player, k),
+  population: () => workers.list.length,
+  freeWorkers: () => workers.free(),
+  buildingDone: id => builds.isDone(id),
+  buyUpgrade(k) {
+    const u = UPGRADES[k], lv = S.up[k];
+    if (lv >= u.costs.length || S.coins < u.costs[lv]) return;
+    S.coins -= u.costs[lv]; S.up[k]++;
+    player.applyStats();
+    missions.event('upgrade');
+    sfx.upgrade();
+    burst(player.pos.x, 1, player.pos.z, { n: 20, colors: [0xffe066, 0xffffff, 0x8fd3ff], speed: 3, up: 5, size: 0.12, life: 0.8 });
+    hud.toast(`⬆ ${t('upgraded', { x: t('up_' + k) })}`, 'good');
+    hud.newDot('btnUpgrade', false);
+    saveNow();
+  },
+  buyTool(k) {
+    const u = TOOLS[k], lv = S.tool[k];
+    if (lv >= u.costs.length) return;
+    const c = u.costs[lv];
+    if (S.coins < c.coin) return;
+    for (const m in c) if (m !== 'coin' && items.count(player, m) < c[m]) return;
+    for (const m in c) if (m !== 'coin') items.consume(player, m, c[m]);
+    S.coins -= c.coin; S.tool[k]++;
+    player.applyStats();
+    missions.event('tool');
+    sfx.anvil(); setTimeout(() => sfx.upgrade(), 150);
+    const a = stations.anvil.pos;
+    burst(a.x, 1, a.z, { n: 24, colors: [0xffb14a, 0xffe066, 0xffffff], speed: 4, up: 5, size: 0.08, life: 0.6 });
+    hud.toast(`⚒ ${t('upgraded', { x: t('tool_' + k) })}`, 'good');
+    saveNow();
+  },
+  hire(job) {
+    const j = JOBS[job];
+    if (workers.free() <= 0 || S.coins < j.cost || !builds.isDone(j.needs)) return;
+    if (j.max && S.hired.filter(h => h === job).length >= j.max) return;
+    S.coins -= j.cost; S.hired.push(job);
+    workers.sync(player);
+    const w = workers.list[S.hired.length - 1];
+    burst(w.x, 1, w.z, { n: 16, colors: [0xffe066, 0xffffff], speed: 2.5, up: 4, size: 0.1, life: 0.7 });
+    sfx.upgrade();
+    hud.toast(`${iconImg('people')} ${t('hired', { j: t('job_' + job) })}`, 'good');
+    hud.newDot('btnHire', false);
+    saveNow();
+  },
+  afterClear() { hud.toast(t('nextSoon')); },
+  onClose() { perfReset(); },
+};
+ui.init(game);
+function openSmithy() { unlock(); ui.show('smithy'); }
+
+// ---- ミッション ----
+function missionTick() {
+  const ctx = { builds, rank: rankNow() };
+  const done = missions.check(ctx);
+  if (done) {
+    sfx.mission();
+    if (done.reward) {
+      S.coins += done.reward; S.earned += done.reward; unlockThing('coins');
+      hud.toast(`⭐ ${t('missionDone')} ${iconImg('coin')}+${done.reward}`, 'good');
+    } else hud.toast(`⭐ ${t('missionDone')}`, 'good');
+    for (const u of done.unlock || []) unlockThing(u, u === 'gear' ? null : 'unlock_' + u);
+    if (done.id === 'house') unlockThing('hp');
+    if (done.type === 'boss') clearT = 2.5;
+    dirty = true;
+  }
+  const m = missions.current();
+  if (!m) { hud.mission(`🌟 ${t('m_free')}`, null, 0); return; }
+  if (m.type === 'upgrade') hud.newDot('btnUpgrade', true);
+  if (m.type === 'hire') hud.newDot('btnHire', true);
+  hud.mission(t('m_' + m.id, { n: m.n }), missions.progress(m, ctx), m.reward);
+}
+
+// ミッションの目的地（画面の外なら端に矢印）
+function missionTarget() {
+  const m = missions.current();
+  if (!m) return null;
+  const P = player.pos;
+  switch (m.type) {
+    case 'gather': {
+      if (player.bag.length) return null;
+      let best = null, bd = Infinity;
+      for (const n of resources.nodes) if (n.type === 'tree' && n.state === 'ok' && world.isOwned(n.land)) { const d = Math.hypot(n.x - P.x, n.z - P.z); if (d < bd) { bd = d; best = n; } }
+      return best && bd > 2 ? { x: best.x, z: best.z, y: 2.8 } : null;
+    }
+    case 'feed': { const s = stations.get('sawmill'); return { x: s.inPos.x, z: s.inPos.z }; }
+    case 'take': { const s = stations.get('sawmill'); return { x: s.outPos.x, z: s.outPos.z }; }
+    case 'make': { const s = stations.get('stonework'); return { x: s.inPos.x, z: s.inPos.z }; }
+    case 'stock': return { x: stations.shop.stock.x, z: stations.shop.stock.z };
+    case 'earn': return S.shop.coins > 0 ? { x: stations.shop.coinPos.x, z: stations.shop.coinPos.z } : { x: stations.shop.stock.x, z: stations.shop.stock.z };
+    case 'tool': return { x: stations.anvil.pos.x, z: stations.anvil.pos.z };
+    case 'kill': { const z = ch.spawns.find(s => s.type === m.kind); return z ? { x: z.x, z: z.z, y: 1.5 } : null; }
+    case 'boss': { const b = enemies.boss; return b && b.alive ? { x: b.x, z: b.z, y: 4 } : null; }
+    default: return null;
+  }
+}
+
+// ---- 章クリア ----
+function chapterClear() {
+  S.cleared[1] = true;
+  world.setLush(1);
+  sfx.fanfare();
+  for (let i = 0; i < 6; i++) setTimeout(() => {
+    const x = player.pos.x + (Math.random() - 0.5) * 12, z = player.pos.z - 2 - Math.random() * 8;
+    burst(x, 5 + Math.random() * 2, z, { n: 40, colors: [0xff6b6b, 0xffd93d, 0x6bcbff, 0x7ee06a, 0xff9ff3, 0xffffff], speed: 6, up: 2, size: 0.14, life: 1.6, g: 4, floor: false });
+    sfx.pop();
+  }, i * 350);
+  for (const s of builds.sites) if (s.done && s.fixed) s.anim = 0;
+  shake(0.4);
+  saveNow();
+  const rank = rankNow(), pop = workers.list.length, time = S.time;
+  const text = t('shareText', { r: rank, p: pop, t: fmtTime(time) });
+  setTimeout(() => ui.show('clear', {
+    rank, pop, time,
+    shareUrl: 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(GAME_URL),
+  }), 2200);
+}
+
+// ---- 留守の間の売上 ----
+function awayReport() {
+  const now = Date.now();
+  if (!S.lastSeen || now - S.lastSeen < 60 * 1000) return null;
+  return offlineSales((now - S.lastSeen) / 1000);
+}
+function offlineSales(sec) {
+  const n = j => S.hired.filter(h => h === j).length;
+  const gather = 0.1 * (n('lumber') * (builds.isDone('sawmill') ? 1 : 0) + n('miner') * (builds.isDone('stonework') ? 1 : 0));
+  const stock = stations.proc.reduce((a, p) => a + (p.site.done ? stations.st(p).out : 0), 0);
+  const rate = n('carrier') ? Math.min(gather + stock / Math.max(sec, 1), n('carrier') * 0.25) : 0;
+  const r = stations.offline(sec, { rate, price: 5 });
+  if (!r || r.money <= 0) return null;
+  S.coins += r.money; S.earned += r.money;
+  return { ...r, capped: sec > SHOP.offlineMax };
 }
 
 // ---- セーブ ----
-let dirty = false;
 function saveNow() {
+  S.lastSeen = Date.now();
   writeSave({
-    v: 1, ch: CH, time: Math.round(playTime), gathered,
+    v: 2, state: S,
     builds: builds.toSave(),
-    bag: items.bag.map(it => it.kind),
+    bag: player.bag.map(it => it.kind),
     hp: Math.round(player.hp * 10) / 10, px: Math.round(player.pos.x * 100) / 100, pz: Math.round(player.pos.z * 100) / 100,
     settings,
-  });
+  }, SLOT);
   dirty = false;
 }
-setInterval(() => saveNow(), 5000);
-window.addEventListener('pagehide', saveNow);
-document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); perfReset(); });
+let started = false;
+setInterval(() => { if (started) saveNow(); }, 5000);
+window.addEventListener('pagehide', () => { if (started) saveNow(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && started) saveNow(); perfReset(); });
 
 // ---- 設定 ----
 hud.init();
 hud.texts();
+function settingsTexts() {
+  $('setTitle').textContent = t('settings');
+  $('lblSound').textContent = t('sound');
+  $('sOn').textContent = t('on'); $('sOff').textContent = t('off');
+  $('lblLang').textContent = t('language');
+  $('btnReset').textContent = t('reset');
+  $('resetMsg').textContent = t('resetAsk');
+  $('btnResetYes').textContent = t('yes'); $('btnResetNo').textContent = t('cancel');
+  $('btnClose').textContent = t('close');
+  $('btnAway').textContent = t('debugAway');
+  $('btnAway').hidden = !DEBUG;
+}
 function syncSettingsUi() {
+  settingsTexts();
   document.querySelectorAll('[data-sound]').forEach(b => b.classList.toggle('on', (b.dataset.sound === '1') === soundOn()));
   document.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('on', b.dataset.lang === i18n.lang));
   $('qInfo').textContent = `${t('quality')}: ×${quality.ratio} ${quality.shadows ? '☀' : ''} ${quality.auto ? '(' + t('qAuto') + ')' : ''}`;
 }
+const settingsOpen = () => !$('settings').hidden;
 $('btnGear').addEventListener('click', () => { unlock(); syncSettingsUi(); $('resetAsk').hidden = true; $('settings').hidden = false; });
-$('btnClose').addEventListener('click', () => { $('settings').hidden = true; });
+$('btnClose').addEventListener('click', () => { $('settings').hidden = true; perfReset(); });
 $('settings').addEventListener('pointerdown', e => { if (e.target.id === 'settings') $('settings').hidden = true; });
 document.querySelectorAll('[data-sound]').forEach(b => b.addEventListener('click', () => {
   settings.sound = b.dataset.sound === '1'; setSound(settings.sound); unlock(); sfx.pop(); syncSettingsUi(); saveNow();
@@ -195,87 +432,131 @@ document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click'
 $('btnReset').addEventListener('click', () => { $('resetAsk').hidden = false; });
 $('btnResetNo').addEventListener('click', () => { $('resetAsk').hidden = true; });
 $('btnResetYes').addEventListener('click', () => {
-  window.removeEventListener('pagehide', saveNow);
-  eraseSave(settings);
+  started = false;
+  eraseSave(settings, SLOT);
   location.reload();
 });
+$('btnAway').addEventListener('click', () => {
+  $('settings').hidden = true;
+  const r = offlineSales(3600);
+  if (r) ui.show('away', r);
+});
+$('btnUpgrade').addEventListener('click', () => { unlock(); hud.newDot('btnUpgrade', false); ui.show('upgrade'); });
+$('btnHire').addEventListener('click', () => { unlock(); hud.newDot('btnHire', false); ui.show('hire'); });
 onFirstTouch(unlock);
 window.addEventListener('resize', resize);
+hud.gates(S.unlocked, false);
 
-// ---- 住民（負荷確認用。区切り2で本物の住民にする） ----
-function makeVillagers(n, zone) {
-  const rig = new Rig(villagerParts(), n);
-  const shirts = [0xf28b50, 0x5fb3e8, 0xe86a8a, 0x8bd16a, 0xf5c542, 0xa98bf0];
-  const list = [];
-  for (let i = 0; i < n; i++) {
-    const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * zone.r;
-    list.push({ x: zone.x + Math.cos(a) * r, z: zone.z + Math.sin(a) * r, tx: 0, tz: 0, wait: Math.random() * 2, yaw: a, walk: Math.random() * 6, moving: 0, color: new THREE.Color(shirts[i % shirts.length]) });
-  }
-  const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(1, 1, 1), UP = new THREE.Vector3(0, 1, 0);
-  const angles = new Array(8).fill(0);
-  return {
-    list,
-    update(dt) {
-      for (const v of list) {
-        v.wait -= dt;
-        if (v.wait <= 0) {
-          const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * zone.r;
-          v.tx = zone.x + Math.cos(a) * r; v.tz = zone.z + Math.sin(a) * r; v.wait = 3 + Math.random() * 4;
-        }
-        const dx = v.tx - v.x, dz = v.tz - v.z, d = Math.hypot(dx, dz);
-        v.moving = d > 0.3 ? 1 : 0;
-        if (v.moving) { v.x += dx / d * 2.2 * dt; v.z += dz / d * 2.2 * dt; v.yaw = Math.atan2(dx, dz); v.walk += dt * 10; }
-        world.resolve(v, 0.3);
-      }
-    },
-    render(b) {
-      rig.begin();
-      for (const v of list) {
-        const s = Math.sin(v.walk) * 0.7 * v.moving;
-        angles[0] = s; angles[1] = -s; angles[6] = -s; angles[7] = s;
-        _m.compose(_p.set(v.x, Math.abs(Math.cos(v.walk)) * 0.06 * v.moving, v.z), _q.setFromAxisAngle(UP, v.yaw), _s);
-        rig.push(_m, angles, v.color);
-        b.push(v.x, v.z, 0.35);
-      }
-      rig.end();
-    },
-  };
+// ---- はじめる ----
+function begin() {
+  unlock();
+  started = true;
+  $('mission').hidden = false;
+  const r = awayReport();
+  if (r) ui.show('away', r);
+  else if (S.mission === 0) hud.toast(`🔥 ${t('ch1_title')}`);
+  saveNow();
 }
+if (sessionStorage.getItem('ctk-autostart')) { sessionStorage.removeItem('ctk-autostart'); begin(); }
+else ui.showTitle(hasSave, DEBUG, debugCh => { if (debugCh) debugStart(debugCh); else begin(); });
+
+// デバッグ：素材とコインを大量に持って章の最初から（デバッグ用のセーブを作り直して読み込み直す）
+function debugStart() {
+  resetState();
+  S.coins = 99999;
+  S.up.bag = UPGRADES.bag.costs.length;
+  S.unlocked = { bag: true, hp: true, coins: true };
+  S.lastSeen = Date.now();
+  const kinds = Object.keys(MATERIALS), cap = UPGRADES.bag.values[S.up.bag];
+  writeSave({ v: 2, state: S, builds: {}, bag: Array.from({ length: cap - 10 }, (_, i) => kinds[i % kinds.length]), hp: 99, settings }, SLOT);
+  sessionStorage.setItem('ctk-autostart', '1');
+  location.reload();
+}
+
+// ---- 負荷確認用：?stress=150 で住民とスライムをたくさん歩かせる ----
+const stressN = Math.min(400, parseInt(params.get('stress') || '0', 10) || 0);
+let crowd = null;
+if (stressN > 0) {
+  const f = ch.lands[0].rect, zone = { x: (f.x0 + f.x1) / 2, z: (f.z0 + f.z1) / 2, r: 12 };
+  for (let i = 0; i < Math.floor(stressN / 2); i++) enemies.spawn('slime', zone, { passive: true, color: new THREE.Color().setHSL(Math.random(), 0.6, 0.6).getHex() });
+  crowd = [];
+  for (let i = 0; i < stressN - Math.floor(stressN / 2); i++) {
+    const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * zone.r;
+    crowd.push({ x: zone.x + Math.cos(a) * r, z: zone.z + Math.sin(a) * r, tx: 0, tz: 0, wait: 0, yaw: 0, walk: 0, moving: 0, color: new THREE.Color().setHSL(Math.random(), 0.6, 0.6), zone });
+  }
+}
+const showFps = stressN > 0 || params.has('fps');
+if (DEBUG) window.ctk = { S, player, items, builds, resources, enemies, world, stations, workers, missions };
 
 // ---- 毎フレーム ----
 const move = { x: 0, z: 0, m: 0 };
 const camTarget = player.pos.clone();
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s1 = new THREE.Vector3(1, 1, 1), UP = new THREE.Vector3(0, 1, 0);
+const cang = [0, 0, 0, 0, 0, 0, 0, 0];
 let last = performance.now(), time = 0, missionT = 0, fpsT = 0;
 hud.moveHint(true);
 
 function frame(now) {
   requestAnimationFrame(frame);
   const raw = (now - last) / 1000; last = now;
-  const dt = Math.min(Math.max(raw, 0), 1 / 20);
-  time += dt; playTime += dt;
+  const paused = !started || ui.blocking() || settingsOpen();
+  const dt = paused ? 0 : Math.min(Math.max(raw, 0), 1 / 20);
+  const fdt = Math.min(Math.max(raw, 0), 1 / 20);
+  time += fdt;
+  if (!paused) S.time += dt;
   perfTick(raw);
 
-  readMove(move);
-  player.update(dt, { move, world, resources, enemies, items });
-  enemies.update(dt, player);
-  if (villagers) villagers.update(dt);
-  resources.update(dt);
-  items.update(dt, player, time, itemHooks);
-  builds.update(dt, time, player, items, buildHooks);
+  if (paused) { move.x = move.z = move.m = 0; } else readMove(move);
+  if (!paused) {
+    player.update(dt, { move, world, resources, enemies });
+    enemies.update(dt, player, bossHooks);
+    workers.update(dt, player, stationHooks);
+    resources.update(dt);
+    items.update(dt, player, time, itemHooks);
+    builds.update(dt, time, player, items, coins, buildHooks);
+    stations.update(dt, time, player, stationHooks);
+    if (crowd) for (const v of crowd) {
+      v.wait -= dt;
+      if (v.wait <= 0) { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * v.zone.r; v.tx = v.zone.x + Math.cos(a) * r; v.tz = v.zone.z + Math.sin(a) * r; v.wait = 3 + Math.random() * 4; }
+      const dx = v.tx - v.x, dz = v.tz - v.z, d = Math.hypot(dx, dz);
+      v.moving = d > 0.3 ? 1 : 0;
+      if (v.moving) { v.x += dx / d * 2.2 * dt; v.z += dz / d * 2.2 * dt; v.yaw = Math.atan2(dx, dz); v.walk += dt * 10; }
+      world.resolve(v, 0.3);
+    }
+    if (clearT > 0) { clearT -= dt; if (clearT <= 0) chapterClear(); }
+  } else {
+    // メニュー中も山やコインは描く
+    stations.update(0, time, { pos: { x: 1e9, z: 1e9 }, alive: false, bag: [], cap: 0 }, stationHooks, true);
+  }
+  coins.update(fdt);
   world.update(time);
-  updateFx(dt);
+  updateFx(fdt);
+
+  // 予告の円
+  if (warn.visible) { warn.userData.t += dt; const k = Math.min(1, warn.userData.t / 1.0); warn.scale.setScalar(warn.userData.r * (0.3 + 0.7 * k)); warn.material.opacity = 0.25 + 0.25 * Math.sin(time * 20); }
 
   // まとめて描く物
   blobs.begin();
   if (player.alive || player.m.body.rotation.z < 1.5) blobs.push(player.pos.x, player.pos.z, 0.5);
   enemies.render(blobs);
-  if (villagers) villagers.render(blobs);
+  people.begin();
+  workers.render(people, blobs, time);
+  stations.renderPeople(people, blobs);
+  if (crowd) for (const v of crowd) {
+    const s = Math.sin(v.walk) * 0.7 * v.moving;
+    cang[0] = s; cang[1] = -s; cang[6] = -s; cang[7] = s;
+    _m4.compose(_v.set(v.x, 0, v.z), _q.setFromAxisAngle(UP, v.yaw), _s1);
+    people.push(_m4, cang, v.color);
+    blobs.push(v.x, v.z, 0.35);
+  }
+  people.end();
   items.groundShadows(blobs);
   blobs.end();
   items.render(time);
+  coins.end();
 
   // カメラは主人公を追いかける（回転なし）
-  const ck = Math.min(1, dt * 7);
+  const ck = Math.min(1, fdt * 7);
   camTarget.x += (player.pos.x - camTarget.x) * ck;
   camTarget.z += (player.pos.z - camTarget.z) * ck;
   placeCamera(camTarget, shakeState.x, shakeState.y);
@@ -283,26 +564,64 @@ function frame(now) {
 
   // 画面の表示
   if (player.fullNear) fullT = Math.max(fullT, 0.3);
-  if (fullT > 0) {
-    fullT -= dt;
-    fullSfx -= dt;
-    if (fullSfx <= 0) { sfx.full(); fullSfx = 1.6; }
-  } else fullSfx = 0;
+  if (fullT > 0) { fullT -= fdt; fullSfx -= fdt; if (fullSfx <= 0 && !paused) { sfx.full(); fullSfx = 1.6; } } else fullSfx = 0;
   hud.hp(player.hp, player.maxHp);
-  hud.bag(items.bag.length, items.cap);
-  const site = builds.current();
-  hud.tileLabel(site, builds, site ? site.def.tile[0] : 0, site ? site.def.tile[1] : 0);
-  hud.fullBubble(fullT > 0 && player.alive, player.anchor.x, player.anchor.y + (items.stackTop || 0) + 0.5, player.anchor.z);
-  hud.moveHint(!input.moved);
-  missionT -= dt;
-  if (missionT <= 0) { missionT = 0.25; const m = missionHtml(); if (m) hud.mission(m); }
+  hud.bag(player.bag.length, player.cap);
+  hud.coins(S.coins);
+  hud.rank(rankNow(), chapterName(), workers.list.length);
+  const boss = enemies.boss;
+  if (boss && boss.alive && boss.fight) hud.bossBar(t('boss_' + boss.type), boss.hp / boss.def.hp);
+  drawLabels();
+  hud.moveHint(started && !input.moved);
+  missionT -= fdt;
+  if (missionT <= 0 && started) { missionT = 0.2; missionTick(); }
   if (showFps) {
-    fpsT -= dt;
+    fpsT -= fdt;
     if (fpsT <= 0) {
       fpsT = 0.5;
-      const n = enemies.list.filter(e => e.alive).length + (villagers ? villagers.list.length : 0);
+      const n = enemies.list.filter(e => e.alive).length + workers.list.length + (stations.shop ? stations.shop.customers.length : 0) + (crowd ? crowd.length : 0);
       hud.fps(`${perf.fps.toFixed(0)} fps ・ ×${quality.ratio} ・ ${quality.shadows ? 'shadow' : 'no shadow'} ・ ${n} chars ・ ${renderer.info.render.calls} calls`);
     }
   }
+}
+
+function drawLabels() {
+  hud.labelsBegin();
+  if (started) {
+    const m = missions.current();
+    // 建設マス
+    for (const s of builds.active()) {
+      const d = s.def;
+      const name = d.type === 'land' ? t('buyLand', { l: t('l_' + d.land) }) : t(d.type === 'repair' ? 'repairOf' : 'buildOf', { b: t('b_' + d.model) });
+      const chips = Object.keys(d.cost).map(k => {
+        const n = Math.max(0, builds.need(s, k));
+        return `<span class="chip${n === 0 ? ' ok' : ''}">${iconImg(k === 'coin' ? 'coin' : k)}<b>${n === 0 ? '✓' : n}</b></span>`;
+      }).join('');
+      const isTarget = m && m.type === 'build' && m.target === d.id;
+      hud.label('b-' + d.id, `<div class="tl-name">${name}</div><div class="tl-chips">${chips}</div>`, d.tile[0], 0.3, d.tile[1], 'tile-label' + (isTarget ? ' target' : ''), isTarget);
+    }
+    // 加工場・お店の札（近くにいるときだけ）
+    const P = player.pos, close = (x, z) => Math.hypot(x - P.x, z - P.z) < 9;
+    for (const p of stations.proc) {
+      if (!p.site.done) continue;
+      const st = stations.st(p);
+      if (close(p.inPos.x, p.inPos.z)) hud.label('in-' + p.id, `${iconImg(p.from)}<b>${st.in}</b><small>/${p.def.inCap}</small>`, p.inPos.x, 1.1, p.inPos.z, 'st-label');
+      if (close(p.outPos.x, p.outPos.z) && st.out > 0) hud.label('out-' + p.id, `${iconImg(p.to)}<b>${st.out}</b>`, p.outPos.x, 1.3, p.outPos.z, 'st-label out');
+    }
+    const sh = stations.shop;
+    if (sh && sh.site.done) {
+      if (close(sh.stock.x, sh.stock.z)) {
+        const n = stations.stockTotal();
+        hud.label('stock', `${iconImg('plank')}${iconImg('block')}<b>${n}</b><small>/${SHOP.stockCap}</small>`, sh.stock.x, 1.1, sh.stock.z, 'st-label shop');
+      }
+      if (sh.waiting) hud.label('wait', '…', sh.waiting.x, 2.1, sh.waiting.z, 'bubble');
+    }
+    // ミッションの目的地
+    const tg = missionTarget();
+    if (tg) hud.label('target', '▼', tg.x, tg.y || 1.8, tg.z, 'marker', true);
+    // 満杯
+    if (fullT > 0 && player.alive) hud.label('full', t('full'), player.anchor.x, player.anchor.y + (player.stackTop || 0) + 0.5, player.anchor.z, 'full-bubble');
+  }
+  hud.labelsEnd();
 }
 requestAnimationFrame(frame);

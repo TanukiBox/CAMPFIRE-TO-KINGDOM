@@ -213,39 +213,58 @@ export function campfire() {
   return { group: g, flames };
 }
 
-// ---- 建設マス ----
-export function tileModel() {
-  const g = new THREE.Group();
-  const plate = box(g, 2.5, 0.06, 2.5, 0xf6e4b8, 0, 0.03, 0);
+// ---- 建設マス・加工場の入口・土地を買うマス ----
+// mark: hammer（建てる）/ coin（土地を買う）/ anvil（鍛冶屋）/ none
+export function tileModel(o = {}) {
+  const size = o.size ?? 2.5, g = new THREE.Group();
+  const plate = box(g, size, 0.06, size, o.plate ?? 0xf6e4b8, 0, 0.03, 0);
   plate.receiveShadow = true;
-  const c = 0x8a5f3a, L = 0.7, t = 0.12, e = 1.25;
+  const c = o.border ?? 0x8a5f3a, L = size * 0.28, t = 0.12, e = size / 2;
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     box(g, L, 0.08, t, c, sx * (e - L / 2), 0.07, sz * e);
     box(g, t, 0.08, L, c, sx * e, 0.07, sz * (e - L / 2));
   }
   const inner = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false }));
-  inner.scale.set(2.1, 0.02, 2.1); inner.position.y = 0.07;
+  inner.scale.set(size - 0.4, 0.02, size - 0.4); inner.position.y = 0.07;
   g.add(inner);
-  // 金づちの目印
-  const ham = new THREE.Group();
-  box(ham, 0.1, 0.6, 0.1, C.wood, 0, 0.3, 0);
-  box(ham, 0.42, 0.18, 0.18, C.iron, 0, 0.62, 0);
-  ham.rotation.z = 0.5;
-  g.add(ham);
-  return { group: g, inner, ham };
+  const mark = new THREE.Group();
+  if (o.mark === 'coin') {
+    cyl(mark, 0.3, 0.08, C.gold, 0, 0.55, 0, Math.PI / 2, 0, 0, 12);
+    box(mark, 0.08, 0.3, 0.1, 0xd99a1e, 0, 0.55, 0);
+  } else if (o.mark === 'anvil') {
+    box(mark, 0.3, 0.2, 0.22, 0x3c3f46, 0, 0.35, 0);
+    box(mark, 0.56, 0.14, 0.26, 0x3c3f46, 0, 0.52, 0);
+    box(mark, 0.1, 0.4, 0.1, C.wood, 0.15, 0.8, 0, 0, 0, 0.6);
+    box(mark, 0.26, 0.14, 0.14, C.iron, 0.28, 0.98, 0, 0, 0, 0.6);
+  } else if (o.mark !== 'none') {
+    box(mark, 0.1, 0.6, 0.1, C.wood, 0, 0.3, 0);
+    box(mark, 0.42, 0.18, 0.18, C.iron, 0, 0.62, 0);
+    mark.rotation.z = 0.5;
+  }
+  g.add(mark);
+  return { group: g, inner, mark };
 }
 
 // ---- 主人公 ----
 const SKIN = 0xffd7b0, TUNIC = 0x4f86d9, PANTS = 0x6b4f3a, HAIR = 0x6b3f22;
+const own = c => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
 export function playerModel() {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
+  const shoe = own(0x4a3426);
   const legL = new THREE.Group(); legL.position.set(-0.13, 0.34, 0); body.add(legL);
   const legR = new THREE.Group(); legR.position.set(0.13, 0.34, 0); body.add(legR);
-  for (const l of [legL, legR]) { box(l, 0.18, 0.3, 0.2, PANTS, 0, -0.16, 0); box(l, 0.2, 0.1, 0.26, 0x4a3426, 0, -0.29, 0.03); }
+  for (const l of [legL, legR]) { box(l, 0.18, 0.3, 0.2, PANTS, 0, -0.16, 0); add(l, BOX, 0, 0, -0.29, 0.03, 0.2, 0.1, 0.26, 0, 0, 0, shoe); }
   box(body, 0.58, 0.46, 0.4, TUNIC, 0, 0.58, 0);
   box(body, 0.6, 0.08, 0.42, 0x8a5a2e, 0, 0.4, 0);
   box(body, 0.12, 0.1, 0.05, C.gold, 0, 0.4, 0.22);
+  // よろい（HPを強化すると現れる）
+  const armorMat = own(0xc9ced6);
+  const armor = new THREE.Group(); body.add(armor);
+  add(armor, BOX, 0, -0.34, 0.8, 0, 0.2, 0.1, 0.44, 0, 0, 0.25, armorMat);
+  add(armor, BOX, 0, 0.34, 0.8, 0, 0.2, 0.1, 0.44, 0, 0, -0.25, armorMat);
+  add(armor, BOX, 0, 0, 0.62, 0.205, 0.4, 0.3, 0.04, 0, 0, 0, armorMat);
+  armor.visible = false;
   const head = new THREE.Group(); head.position.set(0, 0.8, 0); body.add(head);
   box(head, 0.6, 0.52, 0.54, SKIN, 0, 0.27, 0);
   box(head, 0.08, 0.13, 0.03, 0x2b2233, -0.13, 0.28, 0.275);
@@ -260,28 +279,38 @@ export function playerModel() {
   const armL = new THREE.Group(); armL.position.set(-0.36, 0.76, 0); body.add(armL);
   const armR = new THREE.Group(); armR.position.set(0.36, 0.76, 0); body.add(armR);
   for (const a of [armL, armR]) { box(a, 0.15, 0.3, 0.17, TUNIC, 0, -0.14, 0); box(a, 0.14, 0.13, 0.15, SKIN, 0, -0.34, 0); }
-  // 背負子（ここに素材が積まれる）
-  box(body, 0.46, 0.5, 0.12, 0x8d5a33, 0, 0.6, -0.27);
-  box(body, 0.08, 0.9, 0.08, 0x6e4426, -0.2, 0.62, -0.36);
-  box(body, 0.08, 0.9, 0.08, 0x6e4426, 0.2, 0.62, -0.36);
-  box(body, 0.56, 0.06, 0.34, 0x6e4426, 0, 0.2, -0.42);
+  // 背負子（ここに素材が積まれる。積載量を強化すると大きくなる）
+  const pack = new THREE.Group(); pack.position.set(0, 0.2, -0.36); body.add(pack);
+  const packMat = own(0x8d5a33);
+  add(pack, BOX, 0, 0, 0.4, 0.09, 0.46, 0.5, 0.12, 0, 0, 0, packMat);
+  box(pack, 0.08, 0.9, 0.08, 0x6e4426, -0.2, 0.42, 0);
+  box(pack, 0.08, 0.9, 0.08, 0x6e4426, 0.2, 0.42, 0);
+  box(pack, 0.56, 0.06, 0.34, 0x6e4426, 0, 0, -0.06);
   const anchor = new THREE.Object3D(); anchor.position.set(0, 0.25, -0.45); body.add(anchor);
-  // 道具
+  // 道具（刃の色は鍛冶屋のレベルで変わる）
   const hand = new THREE.Group(); hand.position.set(0, -0.36, 0.02); hand.rotation.x = -1.2; armR.add(hand);
   const tools = { axe: new THREE.Group(), pick: new THREE.Group(), sword: new THREE.Group() };
+  const toolMat = { axe: own(0xc9ced6), pick: own(0x9aa0a8), sword: own(0xe8edf3) };
   box(tools.axe, 0.07, 0.72, 0.07, C.wood, 0, -0.26, 0);
-  box(tools.axe, 0.06, 0.26, 0.3, 0xc9ced6, 0, -0.52, 0.14);
-  box(tools.axe, 0.07, 0.3, 0.06, 0x9aa0a8, 0, -0.52, 0.3);
+  add(tools.axe, BOX, 0, 0, -0.52, 0.14, 0.06, 0.26, 0.3, 0, 0, 0, toolMat.axe);
+  add(tools.axe, BOX, 0, 0, -0.52, 0.3, 0.07, 0.3, 0.06, 0, 0, 0, toolMat.axe);
   box(tools.pick, 0.07, 0.72, 0.07, C.wood, 0, -0.26, 0);
-  box(tools.pick, 0.08, 0.1, 0.62, 0x9aa0a8, 0, -0.56, 0.02, 0.18, 0, 0);
-  box(tools.pick, 0.06, 0.08, 0.14, 0x9aa0a8, 0, -0.62, 0.36, 0.5, 0, 0);
+  add(tools.pick, BOX, 0, 0, -0.56, 0.02, 0.08, 0.1, 0.62, 0.18, 0, 0, toolMat.pick);
+  add(tools.pick, BOX, 0, 0, -0.62, 0.36, 0.06, 0.08, 0.14, 0.5, 0, 0, toolMat.pick);
   box(tools.sword, 0.08, 0.2, 0.08, 0x6b3f22, 0, -0.04, 0);
   box(tools.sword, 0.3, 0.06, 0.1, C.gold, 0, -0.16, 0);
-  box(tools.sword, 0.05, 0.66, 0.14, 0xe8edf3, 0, -0.52, 0);
+  add(tools.sword, BOX, 0, 0, -0.52, 0, 0.05, 0.66, 0.14, 0, 0, 0, toolMat.sword);
   for (const k in tools) { tools[k].visible = false; hand.add(tools[k]); }
   root.traverse(o => { if (o.isMesh) o.castShadow = false; });
-  return { root, body, head, legL, legR, armL, armR, tools, anchor };
+  return { root, body, head, legL, legR, armL, armR, tools, toolMat, anchor, shoe, armor, armorMat, pack, packMat };
 }
+// 強化レベルごとの色
+export const LEVEL_COLORS = {
+  blade: [0xc9ced6, 0x8fd3ff, 0xffd34d, 0xff8fe0],
+  shoe: [0x4a3426, 0xe24b4b, 0x3a8fe0, 0xf5c542],
+  armor: [0xc9ced6, 0xc9ced6, 0x8fd3ff, 0xffd34d],
+  pack: [0x8d5a33, 0x9c6a3a, 0xb07a40, 0xc98a4b, 0xd89a52, 0xe8b060],
+};
 
 // ---- 素材の形（背中に積む・地面に落ちる） ----
 export function itemGeo(kind) {
@@ -297,8 +326,11 @@ export function itemGeo(kind) {
   }
   if (kind === 'stone') return new THREE.DodecahedronGeometry(0.16, 0).scale(1.05, 0.82, 0.95);
   if (kind === 'jelly') return new THREE.IcosahedronGeometry(0.15, 1).scale(1.12, 0.82, 1.12);
+  if (kind === 'plank') return new THREE.BoxGeometry(0.56, 0.11, 0.24);
+  if (kind === 'block') return new THREE.BoxGeometry(0.3, 0.26, 0.3);
   return new THREE.BoxGeometry(0.25, 0.25, 0.25);
 }
+export const coinGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.05, 10);
 
 // ---- 木・岩（インスタンス用。根元が原点） ----
 export const treeGeos = {
@@ -347,4 +379,36 @@ export function villagerParts() {
     { geo: B(0.12, 0.34, 0.14, -0.3, 0.55, 0), color: SKIN, pivot: [-0.3, 0.7, 0] },
     { geo: B(0.12, 0.34, 0.14, 0.3, 0.55, 0), color: SKIN, pivot: [0.3, 0.7, 0] },
   ];
+}
+
+export function mushroomParts() {
+  const B = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  const cap = new THREE.SphereGeometry(0.52, 9, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.75, 1).translate(0, 0.62, 0);
+  const dots = mergeGeos([
+    new THREE.SphereGeometry(0.09, 6, 4).translate(0.2, 0.92, 0.18),
+    new THREE.SphereGeometry(0.07, 6, 4).translate(-0.25, 0.86, 0.2),
+    new THREE.SphereGeometry(0.08, 6, 4).translate(0.05, 1.0, -0.2),
+    new THREE.SphereGeometry(0.07, 6, 4).translate(-0.18, 0.92, -0.25),
+    new THREE.SphereGeometry(0.06, 6, 4).translate(0.36, 0.78, -0.12),
+  ]);
+  return [
+    { geo: B(0.14, 0.14, 0.2, -0.12, 0.07, 0.02), color: 0x8a5a3a, pivot: [-0.12, 0.2, 0] },
+    { geo: B(0.14, 0.14, 0.2, 0.12, 0.07, 0.02), color: 0x8a5a3a, pivot: [0.12, 0.2, 0] },
+    { geo: new THREE.CylinderGeometry(0.24, 0.3, 0.5, 8).translate(0, 0.38, 0), color: 0xf6e7cc },
+    { geo: cap, tint: true },
+    { geo: dots, color: 0xfff8ee },
+    { geo: mergeGeos([B(0.07, 0.12, 0.03, -0.09, 0.44, 0.27), B(0.07, 0.12, 0.03, 0.09, 0.44, 0.27), B(0.14, 0.03, 0.03, 0, 0.36, 0.27)]), color: 0x2b2233 },
+  ];
+}
+
+export function bossParts() {
+  const parts = slimeParts();
+  parts.push({ geo: mergeGeos([
+    new THREE.CylinderGeometry(0.2, 0.22, 0.12, 8).translate(0, 0.74, 0),
+    new THREE.ConeGeometry(0.05, 0.12, 4).translate(0.14, 0.86, 0),
+    new THREE.ConeGeometry(0.05, 0.12, 4).translate(-0.14, 0.86, 0),
+    new THREE.ConeGeometry(0.05, 0.14, 4).translate(0, 0.87, 0.15),
+    new THREE.ConeGeometry(0.05, 0.12, 4).translate(0, 0.86, -0.15),
+  ]), color: 0xffd34d });
+  return parts;
 }

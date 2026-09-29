@@ -19,14 +19,16 @@ export class Resources {
     this.nodes = ch.nodes.map((n, i) => ({
       ...n, def: NODE_TYPES[n.type], id: i, hp: NODE_TYPES[n.type].hits, state: 'ok', t: 0,
       rot: r() * Math.PI * 2, scl: 0.9 + r() * 0.3, pine: r() < 0.35, wob: 0, dx: 0, dz: 1, respawnT: 0,
+      land: world.landOf(n.x, n.z), claim: null,
     }));
+    this.world = world;
     // 柵の外の飾りの木と岩
-    const f = world.fence, decor = [];
-    for (let i = 0; i < 900 && decor.length < 170; i++) {
+    const f = world.bounds, decor = [];
+    for (let i = 0; i < 1400 && decor.length < 230; i++) {
       const x = f.x0 - 22 + r() * (f.x1 - f.x0 + 44), z = f.z0 - 22 + r() * (f.z1 - f.z0 + 38);
       const out = Math.max(f.x0 - x, x - f.x1, f.z0 - z, z - f.z1);
       if (out < 1.6) continue;
-      if (z > f.z1 + 6 && Math.abs(x) < 10) continue; // 手前はカメラをふさがないように少なめ
+      if (z > f.z1 && z < f.z1 + 18) continue; // 手前（画面の下）はカメラをふさぐので置かない
       decor.push({ type: r() < 0.12 ? 'rock' : 'tree', x, z, y: world.heightAt(x, z), rot: r() * Math.PI * 2, scl: 0.9 + r() * 0.5, pine: r() < 0.5 });
     }
     const trees = this.nodes.filter(n => n.type === 'tree'), rocks = this.nodes.filter(n => n.type === 'rock');
@@ -98,26 +100,41 @@ export class Resources {
     for (const m of [this.round, this.pineM, this.rock]) if (m.instanceColor) m.instanceColor.needsUpdate = true;
   }
 
-  // 手の届く一番近い資源
+  // 手の届く一番近い資源（買った土地のものだけ）
   nearest(x, z) {
     let best = null, bd = Infinity;
     for (const n of this.nodes) {
-      if (n.state !== 'ok') continue;
+      if (n.state !== 'ok' || !this.world.isOwned(n.land)) continue;
       const d = Math.hypot(n.x - x, n.z - z);
       if (d < n.def.reach + 0.35 && d < bd) { bd = d; best = n; }
     }
     return best;
   }
 
+  // 住民用：他の住民が狙っていない一番近い資源
+  claimNearest(type, x, z, who) {
+    let best = null, bd = Infinity;
+    for (const n of this.nodes) {
+      if (n.type !== type || n.state !== 'ok' || !this.world.isOwned(n.land)) continue;
+      if (n.claim && n.claim !== who) continue;
+      const d = Math.hypot(n.x - x, n.z - z);
+      if (d < bd) { bd = d; best = n; }
+    }
+    if (best) best.claim = who;
+    return best;
+  }
+  release(who) { for (const n of this.nodes) if (n.claim === who) n.claim = null; }
+
   // たたく。出てくる素材の数を返す
   hit(n, fx, fz, power = 1) {
     if (n.state !== 'ok') return 0;
     const dx = n.x - fx, dz = n.z - fz, d = Math.hypot(dx, dz) || 1;
     n.dx = dx / d; n.dz = dz / d;
+    let drops = Math.min(power, n.hp);
     n.hp -= power;
     n.wob = 1;
-    let drops = 1;
     if (n.hp <= 0) {
+      n.claim = null;
       drops += n.def.bonus;
       n.state = n.type === 'tree' ? 'fall' : 'break';
       n.t = 0;

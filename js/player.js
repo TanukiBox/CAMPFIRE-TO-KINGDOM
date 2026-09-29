@@ -1,8 +1,9 @@
-// 主人公：移動・近くの物に合わせた自動アクション・HP
+// 主人公：移動・近くの物に合わせた自動アクション・HP。背中に素材を積む「運び手」でもある
 import * as THREE from './lib/three.module.min.js';
 import { scene } from './gfx.js';
-import { playerModel } from './models.js';
+import { playerModel, LEVEL_COLORS } from './models.js';
 import { PLAYER, NODE_TYPES } from './data.js';
+import { S, stat } from './state.js';
 
 const IDLE_ARM = 0.2;
 
@@ -15,8 +16,9 @@ export class Player {
     this.vel = new THREE.Vector3();
     this.lag = new THREE.Vector3();
     this.anchor = new THREE.Vector3();
-    this.maxHp = PLAYER.hp; this.hp = this.maxHp;
-    this.speed = PLAYER.speed; this.dmg = PLAYER.dmg;
+    this.bag = [];
+    this.applyStats();
+    this.hp = this.maxHp;
     this.alive = true;
     this.invul = 0; this.sinceHit = 99; this.hurtT = 0;
     this.swingT = -1; this.swingDur = 0.5; this.target = null; this.targetKind = null; this.hitDone = false;
@@ -24,6 +26,25 @@ export class Player {
     this.walk = 0; this.moveAmt = 0;
     this.kx = 0; this.kz = 0;
     this.fullNear = false;
+  }
+
+  // 強化の値を反映し、見た目も変える
+  applyStats() {
+    this.cap = stat.cap();
+    this.speed = stat.speed();
+    const oldMax = this.maxHp;
+    this.maxHp = stat.maxHp();
+    if (oldMax && this.maxHp > oldMax) this.hp += this.maxHp - oldMax;
+    const m = this.m;
+    m.toolMat.sword.color.setHex(LEVEL_COLORS.blade[S.tool.sword]);
+    m.toolMat.axe.color.setHex(LEVEL_COLORS.blade[S.tool.axe]);
+    m.toolMat.pick.color.setHex(LEVEL_COLORS.blade[S.tool.pick]);
+    for (const k of ['sword', 'axe', 'pick']) m.tools[k].scale.setScalar(1 + S.tool[k] * 0.12);
+    m.shoe.color.setHex(LEVEL_COLORS.shoe[S.up.speed]);
+    m.armor.visible = S.up.hp > 0;
+    m.armorMat.color.setHex(LEVEL_COLORS.armor[S.up.hp]);
+    m.pack.scale.set(1 + S.up.bag * 0.08, 1 + S.up.bag * 0.1, 1 + S.up.bag * 0.08);
+    m.packMat.color.setHex(LEVEL_COLORS.pack[S.up.bag]);
   }
 
   setTool(name) {
@@ -43,15 +64,14 @@ export class Player {
     if (this.hp <= 0) { this.alive = false; this.hooks.onDown(); }
   }
 
-  // ctx: { move, world, resources, enemies, items }
+  // ctx: { move, world, resources, enemies }
   update(dt, ctx) {
-    const { move, world, resources, enemies, items } = ctx;
+    const { move, world, resources, enemies } = ctx;
     this.invul = Math.max(0, this.invul - dt);
     this.hurtT = Math.max(0, this.hurtT - dt);
     this.sinceHit += dt;
     if (!this.alive) { this.vel.set(0, 0, 0); this.animate(dt); return; }
 
-    // 回復
     if (this.sinceHit > PLAYER.regenDelay && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + PLAYER.regenPerSec * dt);
 
     // 移動
@@ -71,13 +91,13 @@ export class Player {
       let target = enemies.nearest(this.pos.x, this.pos.z, PLAYER.reachEnemy), kind = 'enemy';
       if (!target) {
         const n = resources.nearest(this.pos.x, this.pos.z);
-        if (n) { if (items.full) this.fullNear = true; else { target = n; kind = 'node'; } }
+        if (n) { if (this.bag.length >= this.cap) this.fullNear = true; else { target = n; kind = 'node'; } }
       }
       if (target) {
         this.target = target; this.targetKind = kind;
         const tool = kind === 'enemy' ? 'sword' : NODE_TYPES[target.type].tool;
         if (this.setTool(tool)) this.hooks.onSwap(tool);
-        this.swingT = 0; this.swingDur = PLAYER.swing[tool]; this.hitDone = false;
+        this.swingT = 0; this.swingDur = stat.swing(tool); this.hitDone = false;
       }
     }
     if (this.swingT >= 0) {
@@ -87,7 +107,7 @@ export class Player {
         this.hitDone = true;
         const t = this.target;
         const ok = this.targetKind === 'enemy'
-          ? t.alive && Math.hypot(t.x - this.pos.x, t.z - this.pos.z) < PLAYER.reachEnemy + 0.8
+          ? t.alive && Math.hypot(t.x - this.pos.x, t.z - this.pos.z) - t.r < PLAYER.reachEnemy + 0.8
           : t.state === 'ok' && Math.hypot(t.x - this.pos.x, t.z - this.pos.z) < t.def.reach + 0.8;
         if (ok) this.hooks.onHit(this.targetKind, t);
       }
@@ -118,7 +138,6 @@ export class Player {
     m.legR.rotation.x = -sw * 0.7 * moving;
     m.armL.rotation.x = -sw * 0.6 * moving;
     m.body.position.y = Math.abs(Math.cos(this.walk)) * 0.07 * moving;
-    // 振り
     let arm = IDLE_ARM + sw * 0.4 * moving, lean = 0;
     const t = this.swingT;
     if (t >= 0) {
@@ -128,7 +147,6 @@ export class Player {
     }
     m.armR.rotation.x = arm;
     m.body.rotation.x = lean;
-    // 倒れた・攻撃を受けた
     if (!this.alive) m.body.rotation.z = Math.min(Math.PI / 2, m.body.rotation.z + dt * 6);
     else m.body.rotation.z = 0;
     m.root.visible = !(this.invul > 0 && this.alive && Math.floor(this.invul * 16) % 2 === 1);
