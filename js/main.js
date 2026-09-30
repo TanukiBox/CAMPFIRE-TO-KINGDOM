@@ -290,6 +290,7 @@ const buildHooks = {
       sfx.fanfare();
     } else {
       hud.toast(`🔨 ${t(d.type === 'repair' ? 'repaired' : 'built', { b: t('b_' + d.model) })}`, 'good');
+      if (d.storage) setTimeout(() => unlockThing('store', 'unlock_store'), 1200);
       if (d.pop) { const before = workers.list.length; workers.sync(player); const n = workers.list.length - before; if (n) setTimeout(() => hud.toast(`${iconImg('people')} ${t('newPeople', { n })}`), 900); }
     }
     gainXp(LEVEL.build, d.tile[0], d.tile[1]);
@@ -434,6 +435,23 @@ const game = {
     missions.event('facility');
     hud.toast(`🏗 ${t('facUp', { b: t('b_' + d.model), n: lv + 2 })}`, 'good');
     saveNow();
+  },
+  // 倉庫の中身を売る（値段は素材の値段。市場より安い）
+  sellPrice: k => (MATERIALS[k] && MATERIALS[k].price) || STORAGE.sellMin,
+  storageTotal: () => stations.storageTotal(),
+  storageCap: () => stations.storageCap(),
+  sellStorage(k, n) {
+    n = Math.min(n, S.storage[k] || 0);
+    if (!stations.storageReady() || n <= 0) return;
+    S.storage[k] -= n;
+    if (!S.storage[k]) delete S.storage[k];
+    const money = n * game.sellPrice(k);
+    addCoins(money);
+    S.stats.sold += n;
+    const d = stations.storage.door;
+    burst(d.x, 1.2, d.z, { n: 12, colors: [0xffd84a, 0xffffff], speed: 2.5, up: 4, size: 0.1, life: 0.6 });
+    hud.toast(`${iconImg(k)} ${t('soldN', { x: t('m_' + k), n })} ${iconImg('coin')}+${money}`, 'good');
+    dirty = true;
   },
   // 倉庫の強化（預けられる数が増える）
   buyStorage() {
@@ -845,10 +863,12 @@ $('btnAway').addEventListener('click', () => {
 });
 $('btnUpgrade').addEventListener('click', () => { unlock(); hud.newDot('btnUpgrade', false); ui.show('upgrade'); });
 $('btnHire').addEventListener('click', () => { unlock(); hud.newDot('btnHire', false); ui.show('hire'); });
+$('btnStore').addEventListener('click', () => { unlock(); hud.newDot('btnStore', false); ui.show('store'); });
 $('btnBook').addEventListener('click', () => { unlock(); hud.newDot('btnBook', false); ui.show('book'); });
 onFirstTouch(unlock);
 window.addEventListener('resize', resize);
 if (S.stats.kills > 0) S.unlocked.book = true;
+if (stations.storageReady()) S.unlocked.store = true;
 hud.gates(S.unlocked, false);
 
 // ---- はじめる ----

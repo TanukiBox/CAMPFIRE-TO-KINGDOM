@@ -23,6 +23,7 @@ export const JOB_UP = { costs: [100, 400, 1200, 3000], carry: 2, walk: 0.12, wor
 // cap = レベルごとに預けられる数、keep = 運び手が倉庫に残しておく数（これを超えた分を市場・港へ運んで売る）
 export const STORAGE = {
   cap: [200, 320, 480, 700, 1000], keep: 30,
+  sellMin: 1,   // 倉庫から直接売るときの値段は素材の値段（値段のない木・石は1コイン）
   costs: [
     { plank: 20, block: 20, coin: 150 },
     { plank: 40, block: 40, ore: 10, coin: 500 },
