@@ -12,8 +12,8 @@ const ang = [0, 0, 0, 0, 0, 0, 0, 0];
 const SPEED = 3.0;
 
 export class Workers {
-  constructor(world, builds, resources, stations, items) {
-    Object.assign(this, { world, builds, resources, stations, items });
+  constructor(world, builds, resources, stations, items, enemies) {
+    Object.assign(this, { world, builds, resources, stations, items, enemies });
     this.list = [];
   }
 
@@ -60,6 +60,7 @@ export class Workers {
       if (job && JOBS[job].node) this.gatherer(w, dt, player, hooks, JOBS[job].node, JOBS[job].to);
       else if (job === 'carrier') this.carrier(w, dt, player, hooks);
       else if (job === 'keeper') this.keeperJob(w, dt);
+      else if (job === 'soldier') this.soldier(w, dt, player, hooks);
       else this.idle(w, dt);
       if (job !== 'keeper') this.world.resolve(w, 0.3);
       // 背中の位置
@@ -146,6 +147,38 @@ export class Workers {
         w.actT = 0.1;
         if (!this.stations.takeOne(w.src, w, player, hooks)) w.state = w.bag.length ? 'stock' : 'idle';
       }
+    }
+  }
+
+  // 兵士：主人公の近くの敵を優先して、買った土地の敵を自動で倒す（ぬしは主人公にまかせる）
+  soldier(w, dt, player, hooks) {
+    const bar = this.builds.get('barracks');
+    if (!bar || !bar.done) return this.idle(w, dt);
+    const J = JOBS.soldier;
+    w.think = (w.think || 0) - dt;
+    if (!w.foe || !w.foe.alive || w.foe.state === 'spawn' || w.think <= 0) {
+      w.think = 2;
+      let best = null, bs = Infinity;
+      for (const e of this.enemies.list) {
+        if (!e.alive || e.state === 'spawn' || e.def.boss || e.passive || !this.world.isOwned(e.land)) continue;
+        const dPlayer = Math.hypot(e.x - player.pos.x, e.z - player.pos.z), dMe = Math.hypot(e.x - w.x, e.z - w.z);
+        if (dMe > 35) continue;
+        const score = dPlayer < 12 ? dPlayer : 100 + dMe;
+        if (score < bs) { bs = score; best = e; }
+      }
+      if (best !== w.foe) { w.foe = best; w.swing = 0; }
+    }
+    const e = w.foe;
+    if (!e) { this.goTo(w, bar.def.x - 1 + (w.id.length % 3), bar.def.z + 2.6, dt, 0.3); return; }
+    const dx = e.x - w.x, dz = e.z - w.z, d = Math.hypot(dx, dz);
+    if (d > e.r + 1.0) { this.goTo(w, e.x, e.z, dt * 1.15); w.swing = 0; return; }
+    w.yaw = Math.atan2(dx, dz);
+    w.swing += dt;
+    if (w.swing >= J.every) {
+      w.swing = 0;
+      const killed = this.enemies.hit(e, J.dmg, w.x, w.z);
+      hooks.onSoldierHit(e, killed, w);
+      if (killed) w.foe = null;
     }
   }
 

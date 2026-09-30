@@ -18,7 +18,9 @@ export class Builds {
         if (def.type === 'repair') site.broken = make(true);
         site.fixed = make(false);
         site.fixed.visible = false;
-        world.boxes.push({ x0: def.x - def.w / 2, x1: def.x + def.w / 2, z0: def.z - def.d / 2, z1: def.z + def.d / 2, off: () => !site.done && !site.broken });
+        const off = () => !site.done && !site.broken;
+        if (def.colliders) for (const [x0, x1, z0, z1] of def.colliders) world.boxes.push({ x0: def.x + x0, x1: def.x + x1, z0: def.z + z0, z1: def.z + z1, off });
+        else world.boxes.push({ x0: def.x - def.w / 2, x1: def.x + def.w / 2, z0: def.z - def.d / 2, z1: def.z + def.d / 2, off });
       }
       // 前の章の建物はいつでも出せる。今の章の建物はミッションが進むと現れる
       site.appearAt = def.ch && def.ch < S.ch ? 0 : Math.max(0, this.missions.findIndex(m => m.id === def.appear));

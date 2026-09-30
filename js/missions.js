@@ -1,7 +1,7 @@
 // ミッション：いつも1つだけ表示し、次にやることを案内する。達成するとコインがもらえ、次へ進む
 import { S } from './state.js';
 
-const COUNTED = ['gather', 'feed', 'take', 'stock', 'make', 'kill', 'upgrade', 'tool', 'earn', 'guest'];
+const COUNTED = ['gather', 'feed', 'take', 'stock', 'make', 'kill', 'upgrade', 'tool', 'earn', 'guest', 'ship'];
 
 export class Missions {
   constructor(list) { this.list = list; }

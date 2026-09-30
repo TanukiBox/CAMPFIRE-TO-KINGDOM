@@ -1,7 +1,7 @@
 // 木と岩：切る・割る・倒れる・一定時間で元に戻る。同じ形はまとめて描く
 import * as THREE from './lib/three.module.min.js';
 import { scene, mat, Blobs, quality } from './gfx.js';
-import { treeGeos, rockGeo, ironRockGeo, herbGeo } from './models.js';
+import { treeGeos, rockGeo, ironRockGeo, herbGeo, goldRockGeo } from './models.js';
 import { NODE_TYPES } from './data.js';
 import { rand } from './world.js';
 
@@ -28,6 +28,7 @@ export class Resources {
       const x = f.x0 - 22 + r() * (f.x1 - f.x0 + 44), z = f.z0 - 22 + r() * (f.z1 - f.z0 + 38);
       const out = Math.max(f.x0 - x, x - f.x1, f.z0 - z, z - f.z1);
       if (out < 1.6) continue;
+      if (world.sea && z > world.sea - 1.5) continue; // 海には置かない
       if (z > f.z1 && z < f.z1 + 18) continue; // 手前（画面の下）はカメラをふさぐので置かない
       decor.push({ type: r() < 0.12 ? 'rock' : 'tree', x, z, y: world.heightAt(x, z), rot: r() * Math.PI * 2, scl: 0.9 + r() * 0.5, pine: r() < 0.5 });
     }
@@ -35,7 +36,7 @@ export class Resources {
     const dTrees = decor.filter(d => d.type === 'tree'), dRocks = decor.filter(d => d.type === 'rock');
     const nt = trees.length + dTrees.length;
     // 岩・鉄の岩・薬草は種類ごとに1つの形でまとめて描く
-    const SOLID = { rock: rockGeo, ironrock: ironRockGeo, herb: herbGeo };
+    const SOLID = { rock: rockGeo, ironrock: ironRockGeo, herb: herbGeo, goldrock: goldRockGeo };
     const solidNodes = {};
     for (const k in SOLID) solidNodes[k] = this.nodes.filter(n => n.type === k);
 

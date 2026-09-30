@@ -82,6 +82,8 @@ export const sfx = {
   },
   eat() { tone(420, 0.08, { v: 0.14, to: 700 }); tone(700, 0.1, { type: 'triangle', v: 0.1, to: 1000, at: 0.08 }); },
   burn() { noise(0.18, { v: 0.14, type: 'bandpass', f: 900, q: 0.7, to: 2400 }); },
+  horn() { tone(196, 0.9, { type: 'sawtooth', v: 0.06, a: 0.08 }); tone(147, 0.9, { type: 'triangle', v: 0.08, a: 0.08 }); },
+  clang() { tone(1300, 0.06, { type: 'square', v: 0.025, to: 900 }); },
   sell() { tone(988, 0.07, { type: 'triangle', v: 0.1 }); tone(1319, 0.12, { type: 'triangle', v: 0.1, at: 0.07 }); },
   mission() { [659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.16, { type: 'triangle', v: 0.13, at: i * 0.08 })); },
   unlock() { [523, 784, 1047].forEach((f, i) => tone(f, 0.3, { type: 'triangle', v: 0.14, at: i * 0.12 })); tone(1568, 0.5, { v: 0.08, at: 0.36 }); },

@@ -15,17 +15,17 @@ export const STORAGE = { cap: 200 };
 
 // 強化（コインだけ）。values[レベル] が効果、costs[レベル] が次のレベルへの値段
 export const UPGRADES = {
-  bag:   { values: [10, 15, 20, 26, 32, 40, 50, 60], costs: [30, 70, 140, 240, 380, 600, 900] },   // 背中の積載量
-  speed: { values: [4.4, 4.8, 5.2, 5.6, 6.0, 6.4], costs: [40, 110, 220, 400, 650] },             // 移動速度
-  hp:    { values: [10, 14, 18, 24, 30, 38], costs: [40, 110, 230, 450, 750] },                   // HP
+  bag:   { values: [10, 15, 20, 26, 32, 40, 50, 60, 75, 90], costs: [30, 70, 140, 240, 380, 600, 900, 1400, 2000] },   // 背中の積載量
+  speed: { values: [4.4, 4.8, 5.2, 5.6, 6.0, 6.4, 6.8, 7.2], costs: [40, 110, 220, 400, 650, 1000, 1500] },             // 移動速度
+  hp:    { values: [10, 14, 18, 24, 30, 38, 48, 60], costs: [40, 110, 230, 450, 750, 1100, 1600] },                     // HP
 };
 
 // 鍛冶屋での強化（素材＋コイン）。素材は背中から使う
 export const TOOLS = {
-  sword: { values: [1, 2, 3, 5, 7, 10], swing: [0.42, 0.4, 0.38, 0.36, 0.34, 0.32],
-    costs: [{ block: 3, coin: 40 }, { block: 6, jelly: 4, coin: 100 }, { block: 10, jelly: 8, coin: 220 }, { block: 10, ore: 8, coin: 400 }, { ore: 16, fur: 6, coin: 700 }] },
-  axe:   { values: [1, 2, 3, 4], swing: [0.5, 0.42, 0.36, 0.32], costs: [{ plank: 5, coin: 40 }, { block: 6, coin: 120 }, { ore: 8, coin: 300 }] },
-  pick:  { values: [1, 2, 3, 4], swing: [0.55, 0.46, 0.4, 0.34], costs: [{ plank: 5, coin: 50 }, { block: 6, coin: 140 }, { ore: 8, coin: 300 }] },
+  sword: { values: [1, 2, 3, 5, 7, 10, 14, 20], swing: [0.42, 0.4, 0.38, 0.36, 0.34, 0.32, 0.3, 0.28],
+    costs: [{ block: 3, coin: 40 }, { block: 6, jelly: 4, coin: 100 }, { block: 10, jelly: 8, coin: 220 }, { block: 10, ore: 8, coin: 400 }, { ore: 16, fur: 6, coin: 700 }, { gold: 10, horn: 6, coin: 1200 }, { gold: 20, horn: 12, coin: 2000 }] },
+  axe:   { values: [1, 2, 3, 4, 5], swing: [0.5, 0.42, 0.36, 0.32, 0.28], costs: [{ plank: 5, coin: 40 }, { block: 6, coin: 120 }, { ore: 8, coin: 300 }, { gold: 8, coin: 900 }] },
+  pick:  { values: [1, 2, 3, 4, 5], swing: [0.55, 0.46, 0.4, 0.34, 0.3], costs: [{ plank: 5, coin: 50 }, { block: 6, coin: 140 }, { ore: 8, coin: 300 }, { gold: 8, coin: 900 }] },
 };
 
 // 素材。h = 背中に積んだときの1個の高さ、price = お店で売れる値段（ないものは売らない）
@@ -40,6 +40,9 @@ export const MATERIALS = {
   fur:      { color: 0xc9a27a, h: 0.14, price: 10 },   // 毛皮
   herb:     { color: 0xffffff, h: 0.22, price: 3 },    // 薬草
   medicine: { color: 0xffffff, h: 0.3, price: 18 },    // 薬
+  // 第3章
+  gold: { color: 0xffffff, h: 0.24, price: 25 },       // 金鉱石
+  horn: { color: 0xffffff, h: 0.2, price: 20 },        // 魔物の角
 };
 
 // 切ったり割ったりできる資源。hits 回ぶんたたくと倒れ、たたいた分だけ素材が出て、倒れたとき bonus 個おまけ
@@ -48,6 +51,7 @@ export const NODE_TYPES = {
   rock: { tool: 'pick', hits: 4, drop: 'stone', bonus: 1, respawn: 26, reach: 1.6,  collide: 0.62 },
   ironrock: { tool: 'pick', hits: 5, drop: 'ore', bonus: 1, respawn: 32, reach: 1.6, collide: 0.62 },
   herb: { tool: 'hand', hits: 2, drop: 'herb', bonus: 1, respawn: 18, reach: 1.1, collide: 0 },
+  goldrock: { tool: 'pick', hits: 6, drop: 'gold', bonus: 1, respawn: 40, reach: 1.6, collide: 0.62 },
 };
 
 // 敵。move: hop = 跳ねる / walk = 歩く
@@ -83,6 +87,22 @@ export const ENEMY_TYPES = {
     aggro: 12, leash: 99, atkRange: 1.5, atkCd: 1.2,
     drop: { ore: 10, fur: 6 }, coins: 150, respawn: 0, color: 0x5aa83e, size: 2.0, radius: 0.5, boss: true, attacks: ['dash', 'leap'], minion: 'goblin',
   },
+  // 第3章
+  troll: {
+    rig: 'troll', move: 'walk', hp: 45, speed: 0.9, chase: 2.2, dmg: 5,
+    aggro: 5.5, leash: 9, atkRange: 1.5, atkCd: 1.8,
+    drop: { horn: 1, gold: 1 }, coins: 15, respawn: 26, color: 0x8a9a7a, size: 1.6, radius: 0.45,
+  },
+  skeleton: {
+    rig: 'skeleton', move: 'walk', hp: 25, speed: 1.3, chase: 3.0, dmg: 4,
+    aggro: 6.5, leash: 10, atkRange: 1.2, atkCd: 1.1,
+    drop: { horn: 1 }, coins: 12, respawn: 20, color: 0xf2efe6, size: 1.05, radius: 0.42,
+  },
+  golem: {
+    rig: 'golem', move: 'boss', hp: 700, speed: 1.0, chase: 1.4, dmg: 5, slamDmg: 7, slamR: 3.5, rockDmg: 5,
+    aggro: 13, leash: 99, atkRange: 2.0, atkCd: 1.6,
+    drop: { gold: 12, horn: 8 }, coins: 400, respawn: 0, color: 0x8f8a84, size: 3.0, radius: 0.5, boss: true, attacks: ['throw', 'leap'], minion: 'skeleton',
+  },
 };
 
 // 住民の仕事。node → to = その資源を集めて、その加工場へ運ぶ
@@ -92,7 +112,11 @@ export const JOBS = {
   carrier:   { cost: 80,  needs: 'shop',      color: 0x5f8fd9, carry: 8 },
   keeper:    { cost: 100, needs: 'shop',      color: 0xe86a8a, max: 1 },
   herbalist: { cost: 150, needs: 'pharmacy',  color: 0x9b6fd6, carry: 6, node: 'herb', to: 'pharmacy' },
+  soldier:   { cost: 250, needs: 'barracks',  color: 0x6b7fa8, dmg: 4, every: 0.8 },
 };
+
+// 港：船が来て、船着き場の商品をまとめて買っていく
+export const HARBOR = { every: 50, first: 8, sail: 7, stay: 12, buy: 80, mult: 1.3 };
 
 // 宿屋：旅人が毛皮の毛布を1枚使って泊まり、コインを払う
 export const INN = { every: 8, stay: 6, pay: 15, guests: 4, furCap: 20 };
@@ -119,6 +143,7 @@ const T = (x, z) => ({ type: 'tree', x, z });
 const R = (x, z) => ({ type: 'rock', x, z });
 const I = (x, z) => ({ type: 'ironrock', x, z });
 const H = (x, z) => ({ type: 'herb', x, z });
+const G = (x, z) => ({ type: 'goldrock', x, z });
 // 四角い範囲に間をあけてばらまく（avoid: [x, z, 半径] の場所には置かない）
 function scatter(type, x0, x1, z0, z1, n, seed, avoid = []) {
   const r = rnd(seed), out = [];
@@ -288,6 +313,76 @@ export const CHAPTERS = {
       { id: 'boss2',     type: 'boss',   kind: 'goblinchief', reward: 0 },
     ],
   },
+  3: {
+    name: { before: 'ch2_after', after: 'ch3_after' }, title: 'ch3_title',
+    sea: 30.5,   // これより手前（画面の下）は海
+    lands: [
+      { id: 'harbor', rect: { x0: -17, x1: 33, z0: 13, z1: 29 } },
+      { id: 'ruins',  rect: { x0: 33, x1: 51, z0: -17, z1: 13 } },
+      { id: 'gold',   rect: { x0: 33, x1: 51, z0: -35, z1: -17 } },
+      { id: 'valley', rect: { x0: 33, x1: 51, z0: 13, z1: 29 } },
+    ],
+    nodes: [
+      // 港の土地
+      T(-15.5, 16), T(-14.8, 27.5), T(31.5, 16.5), T(30.8, 27.8), T(26, 15.2),
+      // 骸骨の遺跡
+      R(35.5, 11.5), R(49.5, -15.5), T(49.8, 11.8), T(35, -15.8), R(49.6, 1),
+      // 金の山
+      G(36, -33), G(39.5, -30), G(47, -33.5), G(49.5, -28.5), G(35, -22.5), G(48.5, -21.2), G(44, -19), G(37.5, -19.5),
+      T(49.5, -34), T(34.8, -28),
+      // 巨人の谷
+      R(35, 27.5), R(49.5, 27.8), R(49.5, 14.8), T(35, 15),
+    ],
+    spawns: [
+      { type: 'skeleton', x: 45, z: -1, r: 3.5, n: 4 },
+      { type: 'skeleton', x: 46, z: 5, r: 2.5, n: 3 },
+      { type: 'troll', x: 42, z: -27, r: 4, n: 3 },
+      { type: 'skeleton', x: 38, z: 20, r: 2.5, n: 2 },
+      { type: 'golem', x: 43, z: 22, r: 2, n: 1 },
+    ],
+    builds: [
+      { id: 'harbor',    type: 'land',  land: 'harbor',                                          tile: [0, 11.1],    cost: { coin: 1500 },                         appear: 'buy_harbor' },
+      { id: 'port',      type: 'build', model: 'harbor',   x: 12,   z: 23.6, w: 4.4, d: 3.2, tile: [12, 27.3],  cost: { plank: 40, block: 30, ore: 20 },      appear: 'port',
+        shop: { stock: [-3.6, 3.7], coins: [3.7, 3.7], queue: [0, 3.7], counter: [0, 0.35, 5.6], all: true, mult: 1.3, cap: 80, ship: true } },
+      { id: 'ruins',     type: 'land',  land: 'ruins',                                           tile: [31.3, -3],   cost: { coin: 2000 },                         appear: 'buy_ruins' },
+      { id: 'barracks',  type: 'build', model: 'barracks', x: 37.5, z: -8,   w: 4.0, d: 3.0, tile: [37.5, -5.2], cost: { block: 40, ore: 30, horn: 6 },       appear: 'barracks' },
+      { id: 'house7',    type: 'build', model: 'house',    x: 22,   z: 20,   w: 3.4, d: 3.0, tile: [22, 22.8],   cost: { plank: 30, block: 30, fur: 8, ore: 10 }, appear: 'house7', pop: 2 },
+      { id: 'gold',      type: 'land',  land: 'gold',                                            tile: [42, -15.3],  cost: { coin: 2500 },                         appear: 'buy_gold' },
+      { id: 'bigmarket', type: 'build', model: 'bigmarket', x: -6,  z: 20.5, w: 6.4, d: 3.0, tile: [-6, 23.4],  cost: { plank: 50, block: 40, gold: 10 },     appear: 'bigmarket',
+        shop: { stock: [-4.3, 1.8], coins: [4.2, 1.9], queue: [0, 2.9], counter: [0, 1.12, 0.85], all: true, mult: 2.0, cap: 100, every: 1.8, keeper: false } },
+      { id: 'house8',    type: 'build', model: 'house',    x: 46,   z: -12,  w: 3.4, d: 3.0, tile: [46, -9.2],   cost: { block: 40, gold: 6, horn: 4 },        appear: 'house8', pop: 2 },
+      { id: 'wall',      type: 'build', model: 'wall',     x: 0,    z: -17.4, w: 34, d: 1.2, tile: [-3, -14.6], cost: { block: 80, ore: 30, gold: 12 },       appear: 'wall',
+        colliders: [[-17, -5.2, -0.7, 0.7], [-0.8, 17, -0.7, 0.7]] },
+      { id: 'valley',    type: 'land',  land: 'valley',                                          tile: [40, 11.3],   cost: { coin: 4000 },                         appear: 'buy_valley' },
+    ],
+    boss: 'golem',
+    town: {
+      roads: [[5.5, 13, 5.5, 21], [5.5, 21, 12, 21], [5.5, 18, -6, 18], [17, 2.2, 33, 2.2], [33, 2.2, 37.5, -3.5]],
+      lamps: [[7, 17], [4, 20], [8.8, 21.5], [15.2, 21.5], [-1, 19.5], [-10.5, 19.5], [18, 3.2], [26, 3.2], [32, 3.2]],
+      flags: [[-17.5, -18.8], [16.5, -18.8], [-12, 24], [0, 24.5], [17.5, 26], [6.5, 25]],
+    },
+    missions: [
+      { id: 'buy_harbor', type: 'build',   target: 'harbor', reward: 100 },
+      { id: 'port',       type: 'build',   target: 'port', reward: 150 },
+      { id: 'ship',       type: 'ship',    n: 1, reward: 150 },
+      { id: 'buy_ruins',  type: 'build',   target: 'ruins', reward: 150 },
+      { id: 'horns',      type: 'gather',  kind: 'horn', n: 6, reward: 100 },
+      { id: 'barracks',   type: 'build',   target: 'barracks', reward: 200 },
+      { id: 'soldier',    type: 'hireJob', kind: 'soldier', n: 1, reward: 150 },
+      { id: 'house7',     type: 'build',   target: 'house7', reward: 150 },
+      { id: 'buy_gold',   type: 'build',   target: 'gold', reward: 200 },
+      { id: 'goldore',    type: 'gather',  kind: 'gold', n: 10, reward: 150 },
+      { id: 'bigmarket',  type: 'build',   target: 'bigmarket', reward: 250 },
+      { id: 'bstock',     type: 'stock',   kind: 'bigmarket', n: 15, reward: 150 },
+      { id: 'trolls',     type: 'kill',    kind: 'troll', n: 3, reward: 200 },
+      { id: 'house8',     type: 'build',   target: 'house8', reward: 200 },
+      { id: 'wall',       type: 'build',   target: 'wall', reward: 300 },
+      { id: 'tool3',      type: 'tool',    n: 1, reward: 200 },
+      { id: 'rank3',      type: 'rank',    n: 12, reward: 300 },
+      { id: 'buy_valley', type: 'build',   target: 'valley', reward: 0 },
+      { id: 'boss3',      type: 'boss',    kind: 'golem', reward: 0 },
+    ],
+  },
 };
 
 // 1章から n 章までの配置をまとめる（土地・資源・敵・建物は前の章のものも残る）
@@ -301,6 +396,7 @@ export function chapterData(n) {
     out.spawns.push(...d.spawns);
     out.builds.push(...d.builds.map(b => ({ ...b, ch: c })));
     if (d.town) out.towns.push(d.town);
+    if (d.sea) out.sea = d.sea;
   }
   const cur = CHAPTERS[n];
   out.missions = cur.missions; out.boss = cur.boss; out.name = cur.name; out.title = cur.title;

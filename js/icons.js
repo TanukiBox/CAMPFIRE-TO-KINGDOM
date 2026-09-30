@@ -100,6 +100,16 @@ const DRAW = {
     g.fillStyle = '#a8713e'; g.fillRect(18, 7, 12, 6);
     g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.ellipse(18, 27, 3, 5, 0, 0, Math.PI * 2); g.fill();
   },
+  gold(g) {
+    g.fillStyle = '#e0a82e'; poly(g, [[8, 32], [14, 16], [28, 10], [40, 18], [40, 34], [24, 40]]); g.fill();
+    g.fillStyle = '#f5c542'; poly(g, [[14, 16], [28, 10], [40, 18], [24, 24]]); g.fill();
+    g.fillStyle = '#fff2b0'; poly(g, [[20, 16], [26, 13], [28, 17]]); g.fill();
+  },
+  horn(g) {
+    g.fillStyle = '#f0e6cc'; g.beginPath(); g.moveTo(8, 38); g.quadraticCurveTo(14, 10, 40, 8); g.quadraticCurveTo(24, 18, 20, 40); g.closePath(); g.fill();
+    g.fillStyle = '#8a3a2a'; g.beginPath(); g.moveTo(32, 10); g.quadraticCurveTo(36, 9, 40, 8); g.quadraticCurveTo(35, 12, 33, 15); g.closePath(); g.fill();
+    g.strokeStyle = '#d8c8a0'; g.lineWidth = 2; g.beginPath(); g.moveTo(12, 32); g.lineTo(18, 34); g.moveTo(15, 24); g.lineTo(21, 27); g.stroke();
+  },
   heart(g) {
     g.fillStyle = '#ef4f5f';
     g.beginPath(); g.moveTo(24, 40);

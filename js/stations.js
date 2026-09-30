@@ -1,9 +1,9 @@
 // 建物の働き：加工場（入口に素材→時間で加工品が出口に積もる）・鉱山（自動で鉱石が出る）・お店と市場（客が並んで買い、コインが積もる）
 // 宿屋（旅人が毛皮の毛布で泊まってコインを払う）・鍛冶屋の台・倉庫・焚き火にくべるマス
 import * as THREE from './lib/three.module.min.js';
-import { scene } from './gfx.js';
-import { tileModel } from './models.js';
-import { MATERIALS, SHOP, STORAGE, INN } from './data.js';
+import { scene, bake } from './gfx.js';
+import { tileModel, shipModel } from './models.js';
+import { MATERIALS, SHOP, STORAGE, INN, HARBOR } from './data.js';
 import { S } from './state.js';
 import { pileSpot } from './items.js';
 import { burst, floatText } from './fx.js';
@@ -48,9 +48,16 @@ export class Stations {
           id: d.id, site, stock, coinPos: at(s.coins), queue: at(s.queue),
           counter: { x: d.x + s.counter[0], y: s.counter[1], z: d.z + s.counter[2] },
           sells: s.all ? PRICED : CH1_SELL, mult: s.mult || 1, cap: s.cap || SHOP.stockCap, every: s.every || SHOP.every, keeperOk: s.keeper !== false,
-          customers: [], spawnT: 2, serveT: 0, depT: 0, collectT: 0, keeperT: 0, inflight: 0, waiting: null,
+          customers: [], spawnT: 2, serveT: 0, depT: 0, collectT: 0, keeperT: 0, inflight: 0, waiting: null, ship: s.ship ? { phase: 'away', t: HARBOR.first, sold: 0, money: 0, buyT: 0, x: 0 } : null,
           tile: place(tileModel({ size: 1.7, mark: 'none', plate: 0xfff1c2, border: 0xd99a1e }), stock.x, stock.z),
         };
+        if (sh.ship) {
+          // 船は沖から来て、桟橋の先に着く
+          sh.ship.mesh = bake(shipModel());
+          sh.ship.mesh.visible = false;
+          scene.add(sh.ship.mesh);
+          sh.ship.dock = { x: d.x + 3.4, z: d.z + 8.4 };
+        }
         this.shops.push(sh);
         if (!this.shop) this.shop = sh;
       }
@@ -81,7 +88,7 @@ export class Stations {
   }
   get(id) { return this.proc.find(p => p.id === id); }
   inCount(p, kind) { const s = this.st(p); return p.from.length > 1 ? (s.ink[kind] || 0) : s.in; }
-  shopState(sh) { return sh.id === 'shop' ? S.shop : S.market; }
+  shopState(sh) { return sh.id === 'shop' ? S.shop : S[sh.id]; }
   stockTotal(sh = this.shop) { const st = this.shopState(sh); return sh.sells.reduce((n, k) => n + (st.stock[k] || 0), 0); }
   price(sh, kind) { return Math.round(MATERIALS[kind].price * sh.mult); }
 
@@ -149,7 +156,7 @@ export class Stations {
 
   // カウンターの上の i 番目の商品の場所
   counterSpot(sh, i, kind, out) {
-    const c = sh.counter, wide = sh.id === 'shop' ? 6 : 10, show = i % (wide * 4);
+    const c = sh.counter, wide = sh.id === 'shop' ? 6 : sh.ship ? 5 : 10, show = i % (wide * 4);
     const layer = Math.floor(show / (wide * 2)), row = Math.floor(show / wide) % 2, col = show % wide;
     out.x = c.x - (wide - 1) * 0.21 + col * 0.42;
     out.z = c.z + (row - 0.5) * 0.3;
@@ -304,10 +311,11 @@ export class Stations {
         sh.depT -= dt;
         while (sh.depT <= 0) { sh.depT += 0.07; if (!this.stockOne(sh, player, player, hooks)) { sh.depT = 0; break; } }
       } else sh.depT = 0;
+      if (sh.ship) this.updateShip(sh, dt, time, hooks);
       // 客が来る
-      const keeper = sh.keeperOk ? hooks.keeper() : null;
+      const keeper = sh.keeperOk && !sh.ship ? hooks.keeper() : null;
       sh.spawnT -= dt;
-      if (sh.spawnT <= 0 && sh.customers.length < SHOP.queue) {
+      if (!sh.ship && sh.spawnT <= 0 && sh.customers.length < SHOP.queue) {
         sh.spawnT = (keeper ? SHOP.everyKeeper : sh.every) * (0.75 + Math.random() * 0.5);
         const g = this.gate;
         sh.customers.push({ x: g.x + (Math.random() - 0.5) * 1.5, z: g.z + 4, yaw: Math.PI, walk: 0, moving: 0, state: 'come', color: new THREE.Color(SHIRTS[(Math.random() * SHIRTS.length) | 0]), want: SHOP.buy[0] + Math.floor(Math.random() * (SHOP.buy[1] - SHOP.buy[0] + 1)) });
@@ -345,6 +353,51 @@ export class Stations {
     const max = sh.id === 'shop' ? 24 : 40;
     for (const k of sh.sells) for (let j = 0; j < (state.stock[k] || 0) && i < max; j++, i++) { this.counterSpot(sh, i, k, _v); this.items.draw(k, _v.x, _v.y, _v.z, 0); }
     this.coins.pile(state.coins, sh.coinPos.x, sh.coinPos.z);
+  }
+
+  // 船：沖で待つ → 入港 → 船着き場の商品をまとめて買う → 出港
+  updateShip(sh, dt, time, hooks) {
+    const sp = sh.ship, m = sp.mesh, dock = sp.dock, far = 46;
+    m.visible = sp.phase !== 'away';
+    sp.t -= dt;
+    if (sp.phase === 'away') {
+      if (sp.t <= 0) { sp.phase = 'arrive'; sp.t = HARBOR.sail; sp.sold = 0; sp.money = 0; hooks.onShipArrive(); }
+    } else if (sp.phase === 'arrive') {
+      const k = 1 - Math.max(0, sp.t) / HARBOR.sail;
+      sp.x = dock.x + far * Math.pow(1 - k, 2);
+      if (sp.t <= 0) { sp.phase = 'dock'; sp.t = HARBOR.stay; sp.x = dock.x; }
+    } else if (sp.phase === 'dock') {
+      const state = this.shopState(sh);
+      sp.buyT -= dt;
+      while (sp.buyT <= 0 && sp.sold < HARBOR.buy) {
+        sp.buyT += 0.1;
+        const avail = sh.sells.filter(k => (state.stock[k] || 0) > 0);
+        if (!avail.length) { sp.buyT = 0; break; }
+        const kind = avail[(Math.random() * avail.length) | 0];
+        state.stock[kind]--;
+        this.counterSpot(sh, this.stockTotal(sh), kind, _v);
+        const it = this.items.make(kind, _v.x, _v.y, _v.z);
+        this.items.flyTo(it, dock.x + (Math.random() - 0.5) * 2, 1.4, dock.z, 0.45, null);
+        sp.sold++; sp.money += this.price(sh, kind);
+        if (sp.sold % 4 === 0) sfx.sell();
+      }
+      if (sp.t <= 0) {
+        if (sp.sold) {
+          this.payTo(dock.x, dock.z, sh.coinPos, sp.money, this.shopState(sh));
+          floatText('+' + sp.money, dock.x, 3, dock.z, 'coin');
+          S.stats.sold += sp.sold;
+          hooks.onShip(sp.sold, sp.money);
+        }
+        sp.phase = 'leave'; sp.t = HARBOR.sail;
+      }
+    } else if (sp.phase === 'leave') {
+      const k = 1 - Math.max(0, sp.t) / HARBOR.sail;
+      sp.x = dock.x + far * k * k;
+      if (sp.t <= 0) { sp.phase = 'away'; sp.t = HARBOR.every; }
+    }
+    m.position.set(sp.x, -0.25 + Math.sin(time * 1.4) * 0.08, dock.z);
+    m.rotation.z = Math.sin(time * 1.1) * 0.03;
+    m.rotation.x = Math.sin(time * 0.9) * 0.02;
   }
 
   sell(sh, c, hooks) {
@@ -448,7 +501,7 @@ export class Stations {
     open.forEach((sh, idx) => {
       const state = this.shopState(sh);
       const keeper = sh.keeperOk && S.hired.includes('keeper');
-      const rate = (SHOP.buy[0] + SHOP.buy[1]) / 2 / (keeper ? SHOP.everyKeeper : sh.every);
+      const rate = sh.ship ? HARBOR.buy / HARBOR.every : (SHOP.buy[0] + SHOP.buy[1]) / 2 / (keeper ? SHOP.everyKeeper : sh.every);
       const extra = idx === open.length - 1 ? refill.rate * sec : 0;   // 補充は一番新しいお店へ
       const n = Math.floor(Math.min(rate * sec, this.stockTotal(sh) + extra));
       let left = n;

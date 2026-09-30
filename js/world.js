@@ -1,7 +1,7 @@
 // 地面・土地と柵・焚き火・草花と、ぶつかり判定
 import * as THREE from './lib/three.module.min.js';
 import { scene, mat } from './gfx.js';
-import { campfire, lampModel } from './models.js';
+import { campfire, lampModel, flagModel } from './models.js';
 import { bake } from './gfx.js';
 
 export function rand(seed) {
@@ -21,6 +21,8 @@ const EDGE = 0.45;
 const DULL = [new THREE.Color(0xc2c585), new THREE.Color(0xb0b777)];
 const LUSH = [new THREE.Color(0x93d36b), new THREE.Color(0x7fc45e)];
 const VIVID = [new THREE.Color(0x86d95e), new THREE.Color(0x6fcb4f)];
+const SAND = new THREE.Color(0xf0dca8), WET = new THREE.Color(0xc9b27c);
+const BRIGHT = [new THREE.Color(0x7fde5a), new THREE.Color(0x62cf48)];
 const WILD = new THREE.Color(0x8fae6a), OUTER = new THREE.Color(0x76b85a), DIRT = new THREE.Color(0xe2c38f);
 
 export class World {
@@ -36,8 +38,10 @@ export class World {
     this.boxes = [];
     this.lush = 0;
     this.chapter = ch.n || 1;
+    this.sea = ch.sea || null;
     this.fireBoost = 0;
     this.makeGround();
+    if (this.sea) this.makeSea();
     const cf = campfire();
     cf.group.position.set(ch.campfire[0], 0, ch.campfire[1]);
     scene.add(cf.group);
@@ -57,6 +61,8 @@ export class World {
 
   // 柵の外側ほど高くなる地面
   heightAt(x, z) {
+    // 海（第3章から）：岸から先は下がっていく
+    if (this.sea && z > this.sea - 1) return -1.8 * Math.min(1, (z - this.sea + 1) / 2.5);
     const f = this.bounds;
     const d = Math.max(f.x0 - x, x - f.x1, f.z0 - z, z - f.z1, 0);
     if (d < 2.5) return 0;
@@ -80,7 +86,7 @@ export class World {
     const g = this.ground.geometry, pos = g.attributes.position, col = g.attributes.color;
     const [fx, fz] = this.ch.campfire, a = new THREE.Color(), bb = new THREE.Color(), c = new THREE.Color();
     // 第1章：くすんだ色→鮮やか、第2章から：鮮やか→もっと鮮やか
-    const from = this.chapter >= 2 ? LUSH : DULL, to = this.chapter >= 2 ? VIVID : LUSH;
+    const from = this.chapter >= 3 ? VIVID : this.chapter >= 2 ? LUSH : DULL, to = this.chapter >= 3 ? BRIGHT : this.chapter >= 2 ? VIVID : LUSH;
     a.copy(from[0]).lerp(to[0], this.lush); bb.copy(from[1]).lerp(to[1], this.lush);
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i), h = pos.getY(i);
@@ -90,6 +96,7 @@ export class World {
       if (h > 0) c.lerp(OUTER, Math.min(1, h / 2));
       const dc = Math.hypot(x - fx, z - fz);
       if (dc < 4.2) c.lerp(DIRT, clamp((4.2 - dc) / 1.4, 0, 1));
+      if (this.sea && z > this.sea - 2.5) c.copy(h < -0.4 ? WET : SAND);
       col.setXYZ(i, c.r, c.g, c.b);
     }
     col.needsUpdate = true;
@@ -191,7 +198,7 @@ export class World {
     const grass = [], flowers = [];
     for (let i = 0; i < 1600 && grass.length < 460; i++) {
       const x = f.x0 - 8 + r() * (f.x1 - f.x0 + 16), z = f.z0 - 8 + r() * (f.z1 - f.z0 + 16);
-      if (inAvoid(x, z)) continue;
+      if (inAvoid(x, z) || (this.sea && z > this.sea - 2.5)) continue;
       grass.push([x, z, 0.7 + r() * 0.6, r() * 6]);
       if (r() < 0.3) flowers.push([x + 0.3, z + 0.2, r()]);
     }
@@ -228,6 +235,7 @@ export class World {
         }
       }
       lamps.push(...town.lamps);
+      if (town.flags) for (const [x, z] of town.flags) { const g = bake(flagModel()); g.position.set(x, 0, z); g.rotation.y = -0.3; scene.add(g); this.circles.push({ x, z, r: 0.12 }); }
     }
     if (!tiles.length) return;
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), c = new THREE.Color();
@@ -240,7 +248,20 @@ export class World {
     for (const [x, z] of lamps) { const g = bake(lampModel()); g.position.set(x, 0, z); scene.add(g); this.circles.push({ x, z, r: 0.15 }); }
   }
 
+  makeSea() {
+    const b = this.bounds, cx = (b.x0 + b.x1) / 2;
+    this.water = new THREE.Mesh(new THREE.PlaneGeometry(300, 120).rotateX(-Math.PI / 2),
+      new THREE.MeshLambertMaterial({ color: 0x4fbfe8, transparent: true, opacity: 0.82 }));
+    this.water.position.set(cx, -0.32, this.sea + 58);
+    scene.add(this.water);
+    // 波打ちぎわの白い線
+    this.foam = new THREE.Mesh(new THREE.PlaneGeometry(300, 0.5).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false }));
+    this.foam.position.set(cx, -0.3, this.sea - 1.05 + 0.9);
+    scene.add(this.foam);
+  }
+
   update(t, dt = 0) {
+    if (this.water) { this.water.position.y = -0.32 + Math.sin(t * 0.8) * 0.04; this.foam.material.opacity = 0.45 + Math.sin(t * 1.3) * 0.2; this.foam.position.z = this.sea - 0.15 + Math.sin(t * 0.8) * 0.12; }
     this.fireBoost = Math.max(0, this.fireBoost - dt * 1.5);
     const boost = 1 + this.fireBoost * 0.9;
     this.flames.forEach((f, i) => {

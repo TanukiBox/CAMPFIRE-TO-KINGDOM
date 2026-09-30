@@ -2,13 +2,16 @@
 // ぬし（大スライム）は跳び上がって押しつぶす攻撃と、子分を呼ぶ攻撃をする
 import * as THREE from './lib/three.module.min.js';
 import { Rig } from './rig.js';
-import { slimeParts, mushroomParts, bossParts, wolfParts, goblinParts, chiefParts } from './models.js';
+import * as THREE2 from './lib/three.module.min.js';
+import { scene, mat } from './gfx.js';
+import { slimeParts, mushroomParts, bossParts, wolfParts, goblinParts, chiefParts, trollParts, skeletonParts, golemParts } from './models.js';
 import { ENEMY_TYPES } from './data.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _w = new THREE.Color(0xffffff);
 const UP = new THREE.Vector3(0, 1, 0);
 const ang = [0, 0, 0, 0, 0, 0, 0, 0, 0];
 const HOPPERS = ['slime', 'boss'];
+const HUMANOIDS = ['goblin', 'chief', 'troll', 'skeleton', 'golem'];
 
 export class Enemies {
   constructor(ch, world, cap = 220) {
@@ -17,7 +20,11 @@ export class Enemies {
     this.rigs = {
       slime: new Rig(slimeParts(), cap), mushroom: new Rig(mushroomParts(), 60), boss: new Rig(bossParts(), 2),
       wolf: new Rig(wolfParts(), 60), goblin: new Rig(goblinParts(), 60), chief: new Rig(chiefParts(), 2),
+      troll: new Rig(trollParts(), 30), skeleton: new Rig(skeletonParts(), 60), golem: new Rig(golemParts(), 2),
     };
+    // 巨人が投げる岩
+    this.rocks = [];
+    this.rockMeshes = Array.from({ length: 6 }, () => { const m = new THREE2.Mesh(new THREE2.DodecahedronGeometry(0.55, 0), mat(0x8f8a84)); m.visible = false; m.castShadow = true; scene.add(m); return m; });
     this.bosses = [];
     for (const z of ch.spawns) for (let i = 0; i < z.n; i++) this.spawn(z.type, z);
   }
@@ -185,12 +192,22 @@ export class Enemies {
       if (e.pt > 3.2) {
         const atk = def.attacks[e.cycles % def.attacks.length];
         e.pt = 0; e.hopY = 0;
-        if (atk === 'dash') {
+        if (atk === 'throw') { e.phase = 'throwwind'; }
+        else if (atk === 'dash') {
           e.phase = 'windup';
           const dx = P.x - e.x, dz = P.z - e.z, d = Math.hypot(dx, dz) || 1;
           e.ddx = dx / d; e.ddz = dz / d; e.dashHit = false;
           hooks.onBossDashWarn(e);
         } else e.phase = 'charge';
+      }
+    } else if (e.phase === 'throwwind') {
+      this.face(e, P.x - e.x, P.z - e.z, dt);
+      if (e.pt > 0.8) {
+        e.phase = 'rest'; e.pt = 0; e.cycles++;
+        const targets = [[0, 0], [2.2, 1.2], [-2.2, 1.2]].map(([ox, oz]) => ({ x: P.x + ox * (Math.random() + 0.5), z: P.z + oz * (Math.random() + 0.5) - 0.6 }));
+        targets.forEach((tg, i) => this.rocks.push({ fx: e.x, fz: e.z, fy: 3.5, tx: tg.x, tz: tg.z, t: -i * 0.15, dur: 1.1, mesh: null }));
+        hooks.onBossThrow(e, targets);
+        if (e.cycles % 3 === 0) hooks.onBossCall(e);
       }
     } else if (e.phase === 'windup') {
       e.yaw = Math.atan2(e.ddx, e.ddz);
@@ -223,6 +240,25 @@ export class Enemies {
     this.world.resolve(e, e.r, e.area);
   }
 
+  // 投げた岩を飛ばす。落ちた所に主人公がいればダメージ
+  updateRocks(dt, player, hooks) {
+    for (let i = this.rocks.length - 1; i >= 0; i--) {
+      const r = this.rocks[i];
+      r.t += dt;
+      if (r.t < 0) continue;
+      const k = Math.min(1, r.t / r.dur);
+      if (!r.mesh) r.mesh = this.rockMeshes.find(m => !m.visible) || null;
+      if (r.mesh) { r.mesh.visible = true; r.mesh.position.set(r.fx + (r.tx - r.fx) * k, r.fy * (1 - k) + Math.sin(k * Math.PI) * 5, r.fz + (r.tz - r.fz) * k); r.mesh.rotation.set(k * 9, k * 7, 0); }
+      if (k >= 1) {
+        if (r.mesh) r.mesh.visible = false;
+        this.rocks.splice(i, 1);
+        const hit = player.alive && Math.hypot(player.pos.x - r.tx, player.pos.z - r.tz) < 1.5;
+        hooks.onRockLand(r, hit);
+      }
+    }
+  }
+  clearRocks() { for (const r of this.rocks) if (r.mesh) r.mesh.visible = false; this.rocks.length = 0; }
+
   render(blobs) {
     for (const k in this.rigs) this.rigs[k].begin();
     for (const e of this.list) {
@@ -232,7 +268,7 @@ export class Enemies {
       const y = e.hopY || 0;
       if (e.state === 'spawn') { const k = Math.min(1, e.t / 0.5); sx = sy = k * (1.3 - 0.3 * k); }
       else if (e.phase === 'charge') { const k = Math.min(1, e.pt / 0.7); sy = 1 - 0.3 * k; sx = 1 + 0.2 * k; }
-      else if (e.phase === 'windup') { sy = 0.9; sx = 1.08; }
+      else if (e.phase === 'windup' || e.phase === 'throwwind') { sy = 0.9; sx = 1.08; }
       else if (!HOPPERS.includes(def.rig)) { sy = 1 + Math.sin(e.walk * 2) * 0.04; }
       else if (y > 0.02) { sy = 1.12; sx = 0.92; }
       else { const ph = (e.hop % 1); sy = 0.86 + ph * 0.1; sx = 1.08 - ph * 0.06; }
@@ -246,7 +282,11 @@ export class Enemies {
         if (def.rig === 'wolf') { ang[0] = w; ang[1] = -w; ang[2] = -w; ang[3] = w; }
         else {
           ang[0] = w; ang[1] = -w;
-          if (def.rig === 'goblin' || def.rig === 'chief') { ang[5] = -w * 0.8; ang[6] = e.lunge > 0 || e.phase === 'windup' ? -2.2 * (e.phase === 'windup' ? 1 : e.lunge / 0.3) : w * 0.8; }
+          if (HUMANOIDS.includes(def.rig)) {
+            ang[5] = -w * 0.8; ang[6] = e.lunge > 0 || e.phase === 'windup' ? -2.2 * (e.phase === 'windup' ? 1 : e.lunge / 0.3) : w * 0.8;
+            if (e.phase === 'throwwind') ang[5] = ang[6] = -2.8;
+            ang[7] = ang[6]; ang[8] = ang[5];
+          }
         }
         rig.push(_m, ang, e.flash > 0 ? _w : e.color);
       } else rig.push(_m, null, e.flash > 0 ? _w : e.color);

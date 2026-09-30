@@ -55,7 +55,7 @@ const enemies = new Enemies(ch, world);
 const builds = new Builds(ch, world);
 if (hasSave) builds.load(save.builds);
 const stations = new Stations(ch, builds, items, coins);
-const workers = new Workers(world, builds, resources, stations, items);
+const workers = new Workers(world, builds, resources, stations, items, enemies);
 const missions = new Missions(ch.missions);
 world.addTown(ch.towns);
 world.decorate([...builds.areas(), { x0: ch.burn[0] - 1, x1: ch.burn[0] + 1, z0: ch.burn[1] - 1, z1: ch.burn[1] + 1 }, ...roadAreas(ch.towns)]);
@@ -156,6 +156,7 @@ player.hooks = {
     enemies.resetBoss();
     hud.bossBar(null, null);
     warn.visible = false; warnLine.visible = false;
+    enemies.clearRocks(); for (const w of warnPool) w.visible = false;
     setTimeout(() => hud.fade(true), 700);
     setTimeout(() => {
       player.respawn(ch.start[0], ch.start[1]);
@@ -249,6 +250,14 @@ const stationHooks = {
     dirty = true;
   },
   onSell() { dirty = true; },
+  onShipArrive() { hud.toast(`⛵ ${t('shipCome')}`); sfx.horn(); },
+  onShip(n, money) { missions.event('ship'); hud.toast(`⛵ ${t('shipSold', { n, m: money })}`, 'good'); dirty = true; },
+  onSoldierHit(e, killed, w) {
+    const hy = 0.55 * e.def.size;
+    burst(e.x, hy, e.z, { n: 5, colors: [0xffffff, 0xcfd8e8], speed: 4, up: 1.5, size: 0.08, life: 0.25, g: 0, floor: false });
+    if (Math.hypot(w.x - player.pos.x, w.z - player.pos.z) < 12) sfx.clang();
+    if (killed) onKill(e);
+  },
 };
 
 // ぬし
@@ -256,6 +265,7 @@ const warn = new THREE.Mesh(new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2
 warn.visible = false; warn.renderOrder = 2; scene.add(warn);
 const warnLine = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 6.6).rotateX(-Math.PI / 2), warn.material);
 warnLine.visible = false; warnLine.renderOrder = 2; scene.add(warnLine);
+const warnPool = Array.from({ length: 3 }, () => { const m = new THREE.Mesh(warn.geometry, warn.material); m.scale.setScalar(1.5); m.visible = false; m.renderOrder = 2; scene.add(m); return m; });
 const bossHooks = {
   onBossStart(e) { sfx.roar(); shake(0.4); hud.toast(`⚠ ${t('bossAppear')}`, 'bad'); },
   onBossEnd() { hud.bossBar(null, null); },
@@ -267,6 +277,16 @@ const bossHooks = {
     sfx.roar();
   },
   onBossDash() { warnLine.visible = false; sfx.slash(); shake(0.3); },
+  onBossThrow(e, targets) {
+    sfx.roar();
+    targets.forEach((tg, i) => { const w = warnPool[i]; w.visible = true; w.position.set(tg.x, 0.06, tg.z); w.userData.t = 0; w.userData.life = 1.1 + i * 0.15; });
+  },
+  onRockLand(r, hit) {
+    sfx.slam(); shake(0.3);
+    burst(r.tx, 0.3, r.tz, { n: 14, colors: [0x8f8a84, 0xb4b0a8, 0xe2c38f], speed: 4, up: 3, size: 0.18, life: 0.6 });
+    ring(r.tx, r.tz, 0xe2c38f, 1.8, 0.4);
+    if (hit) player.damage(enemies.bossOf('golem').def.rockDmg, r.tx, r.tz);
+  },
   onBossSlam(e) {
     warn.visible = false;
     sfx.slam(); shake(0.55);
@@ -410,7 +430,8 @@ function missionTarget() {
   }
   switch (m.type) {
     case 'gather': {
-      const type = { wood: 'tree', ore: 'ironrock', herb: 'herb', stone: 'rock' }[m.kind] || 'tree';
+      if (m.kind === 'horn') { let best = null, bd = Infinity; for (const z of ch.spawns) if ((z.type === 'skeleton' || z.type === 'troll') && world.isOwned(world.landOf(z.x, z.z))) { const d = Math.hypot(z.x - P.x, z.z - P.z); if (d < bd) { bd = d; best = z; } } return best && bd > 4 ? { x: best.x, z: best.z, y: 1.5 } : null; }
+      const type = { wood: 'tree', ore: 'ironrock', herb: 'herb', stone: 'rock', gold: 'goldrock' }[m.kind] || 'tree';
       if (items.count(player, m.kind) >= m.n - S.mp && player.bag.length) return null;
       let best = null, bd = Infinity;
       for (const n of resources.nodes) if (n.type === type && n.state === 'ok' && world.isOwned(n.land)) { const d = Math.hypot(n.x - P.x, n.z - P.z); if (d < bd) { bd = d; best = n; } }
@@ -423,6 +444,7 @@ function missionTarget() {
     case 'take': { const s = stations.proc.find(p => p.to === m.kind); return s ? { x: s.outPos.x, z: s.outPos.z } : null; }
     case 'make': { const s = stations.proc.find(p => p.to === m.kind); return s ? (s.gen ? { x: s.outPos.x, z: s.outPos.z } : { x: s.inPos.x, z: s.inPos.z }) : null; }
     case 'stock': { const sh = stations.shops.find(x => x.id === (m.kind || 'shop')); return sh ? { x: sh.stock.x, z: sh.stock.z } : null; }
+    case 'ship': { const sh = stations.shops.find(x => x.ship); return sh ? { x: sh.stock.x, z: sh.stock.z } : null; }
     case 'guest': {
       const inn = stations.inn;
       if (!inn) return null;
@@ -577,7 +599,9 @@ function debugStart(n) {
     for (const m of d.missions) for (const u of m.unlock || []) S.unlocked[u] = true;
   }
   if (n >= 2) { S.bossDead = true; S.hired = ['lumber', 'miner', 'carrier', 'keeper']; S.up.speed = 2; S.up.hp = 2; S.tool = { sword: 3, axe: 2, pick: 2 }; }
-  const kinds = Object.keys(MATERIALS).filter(k => n >= 2 || CHAPTERS[1] && !['ore', 'fur', 'herb', 'medicine'].includes(k)), cap = UPGRADES.bag.values[S.up.bag];
+  if (n >= 3) { S.hired.push('herbalist', 'carrier'); S.up.speed = 4; S.up.hp = 4; S.tool = { sword: 5, axe: 3, pick: 3 }; }
+  const later = { 2: ['ore', 'fur', 'herb', 'medicine'], 3: ['gold', 'horn'] };
+  const kinds = Object.keys(MATERIALS).filter(k => !Object.keys(later).some(c => +c > n && later[c].includes(k))), cap = UPGRADES.bag.values[S.up.bag];
   writeSave({ v: 2, state: S, builds: done, bag: Array.from({ length: cap - 10 }, (_, i) => kinds[i % kinds.length]), hp: 99, settings }, SLOT);
   sessionStorage.setItem('ctk-autostart', '1');
   location.reload();
@@ -596,7 +620,8 @@ if (stressN > 0) {
   }
 }
 const showFps = stressN > 0 || params.has('fps');
-if (DEBUG) window.ctk = { S, player, items, builds, resources, enemies, world, stations, workers, missions };
+// 動作確認用：ctk.step(秒) で画面を描かずに時間を進められる
+if (DEBUG) window.ctk = { S, player, items, builds, resources, enemies, world, stations, workers, missions, step: sec => { for (let i = 0; i < sec * 30; i++) tick(1 / 30, false); } };
 
 // ---- 毎フレーム ----
 const move = { x: 0, z: 0, m: 0 };
@@ -609,6 +634,11 @@ hud.moveHint(true);
 function frame(now) {
   requestAnimationFrame(frame);
   const raw = (now - last) / 1000; last = now;
+  tick(raw, true);
+}
+
+// 1コマぶんの処理。show = 画面に描く（デバッグの早送りでは描かない）
+function tick(raw, show) {
   const paused = !started || ui.blocking() || settingsOpen();
   const dt = paused ? 0 : Math.min(Math.max(raw, 0), 1 / 20);
   const fdt = Math.min(Math.max(raw, 0), 1 / 20);
@@ -620,6 +650,8 @@ function frame(now) {
   if (!paused) {
     player.update(dt, { move, world, resources, enemies });
     enemies.update(dt, player, bossHooks);
+    enemies.updateRocks(dt, player, bossHooks);
+    for (const w of warnPool) if (w.visible) { w.userData.t += dt; if (w.userData.t > w.userData.life) w.visible = false; }
     workers.update(dt, player, stationHooks);
     resources.update(dt);
     items.update(dt, player, time, itemHooks);
@@ -672,7 +704,7 @@ function frame(now) {
   camTarget.x += (player.pos.x - camTarget.x) * ck;
   camTarget.z += (player.pos.z - camTarget.z) * ck;
   placeCamera(camTarget, shakeState.x, shakeState.y);
-  renderer.render(scene, camera);
+  if (show) renderer.render(scene, camera);
 
   // 画面の表示
   if (player.fullNear) fullT = Math.max(fullT, 0.3);
@@ -726,6 +758,11 @@ function drawLabels() {
         hud.label('stock-' + sh.id, `${icons}<b>${stations.stockTotal(sh)}</b><small>/${sh.cap}</small>`, sh.stock.x, 1.1, sh.stock.z, 'st-label shop');
       }
       if (sh.waiting) hud.label('wait-' + sh.id, '…', sh.waiting.x, 2.1, sh.waiting.z, 'bubble');
+      if (sh.ship && close(sh.stock.x, sh.stock.z)) {
+        const sp = sh.ship;
+        const txt = sp.phase === 'away' ? t('shipIn', { s: Math.ceil(sp.t) }) : sp.phase === 'dock' ? t('shipDock') : t('shipSail');
+        hud.label('ship-' + sh.id, `⛵ ${txt}`, sh.stock.x, 2.0, sh.stock.z, 'st-label burn');
+      }
     }
     const inn = stations.inn;
     if (inn && inn.site.done) {
