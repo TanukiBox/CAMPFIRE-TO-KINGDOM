@@ -63,6 +63,45 @@ export const ARMORS = [
   { id: 'dragon', def: 9, hp: 45, cost: { scale: 14, firestone: 6, coin: 4000 }, color: 0xb04ad0 },
 ];
 
+// 武器に付く効果（宝箱の武器・錬金で受けつぐ）。min〜max の値がランダムで付く
+export const AFFIXES = {
+  atk:   { min: 5, max: 20 },    // 攻撃力 +%
+  crit:  { min: 3, max: 10 },    // 会心率 +%
+  cdmg:  { min: 20, max: 60 },   // 会心ダメージ +%
+  steal: { min: 1, max: 4 },     // 与えたダメージの%だけHP回復
+  spd:   { min: 5, max: 15 },    // 振る速さ +%
+  drop:  { min: 5, max: 15 },    // 素材が1個多く出る確率 +%
+  xp:    { min: 10, max: 30 },   // 経験値 +%
+};
+// 武器のレア度：fx = 付く効果の数
+export const RARITY = [
+  { id: 'n', fx: 0, color: '#8a7058' },
+  { id: 'r', fx: 1, color: '#3a8fe0' },
+  { id: 'e', fx: 2, color: '#9a4ad0' },
+  { id: 'l', fx: 3, color: '#e8960e' },
+];
+// 宝箱：モンスターがまれに落とす（ぬしは必ず）。コインでも買える。星の宝箱は試練の塔の「星のかけら」で買う
+export const CHEST = {
+  drop: 0.02, bossDrop: 2,
+  coin: [0, 300, 900, 2000, 4000],   // 章ごとのコインでの値段
+  starPrice: 8,
+  table: {
+    normal: { coins: 30, mat: 45, weapon: 25, rar: [0, 65, 28, 7] },
+    star:   { coins: 0, mat: 30, weapon: 70, rar: [0, 25, 50, 25] },
+  },
+};
+// 錬金：同じ武器をもう1本と、コイン・星のかけらを使って +1。消した武器の効果を1つ受けつぐ
+export const ALCHEMY = { maxPlus: 5, plusAtk: 0.15, coin: 100, star: 1 };
+// ぬしは倒してからこの秒数（遊んでいる時間）で復活する
+export const BOSS = { respawn: 300 };
+// 試練の塔：階ごとに強くなる。5階ごとにぬし
+export const TOWER = {
+  hpUp: 0.2, dmgUp: 0.08,          // 1階ごとに HP・攻撃が増える割合
+  waves: [['slime', 'mushroom', 'bee'], ['wolf', 'boar', 'goblin'], ['skeleton', 'troll', 'crab'], ['lizard', 'drake', 'wisp']],
+  bosses: ['bigslime', 'goblinchief', 'golem', 'dragon'],
+  coins: 40, xp: 15, star: 1, bossStar: 4,
+};
+
 // 住民の依頼：ときどき住民が「○○がほしい」「○○を倒して」とたのむ。かなえるとコインと経験値
 export const REQUESTS = { every: [50, 90], max: 2, names: { ja: ['ミナ', 'ソラ', 'ハル', 'リク', 'ユイ', 'カイ', 'ノア', 'メイ', 'タロ', 'ヒナ'], en: ['Mina', 'Sora', 'Hal', 'Rik', 'Yui', 'Kai', 'Noa', 'May', 'Taro', 'Hina'] } };
 
@@ -89,6 +128,8 @@ export const MATERIALS = {
   horn: { color: 0xffffff, h: 0.2, price: 20 },        // 魔物の角
   // 第4章
   scale: { color: 0xffffff, h: 0.12, price: 40 },      // 竜のうろこ
+  // 試練の塔
+  star: { color: 0xffffff, h: 0.16, price: 30 },       // 星のかけら
   // モンスターの素材（料理や装備に使う）
   mushcap:   { color: 0xffffff, h: 0.2, price: 3 },    // きのこの傘
   honey:     { color: 0xffffff, h: 0.22, price: 5 },   // はちみつ

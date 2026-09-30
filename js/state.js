@@ -1,6 +1,31 @@
 // 進み具合（セーブされる値）と、そこから計算する値
-import { UPGRADES, TOOLS, RANK, LEVEL, WEAPONS, ARMORS } from './data.js';
-export const weaponOf = () => WEAPONS.find(w => w.id === S.weapon) || WEAPONS[0];
+import { UPGRADES, TOOLS, RANK, LEVEL, WEAPONS, ARMORS, PLAYER, ALCHEMY } from './data.js';
+// 持っている武器は1本ずつ { u: 番号, b: 元の武器, p: 錬金の+, r: レア度, fx: [[効果, 値], ...] }
+export function newWeapon(b, r = 0, fx = []) {
+  const w = { u: (S.uid = (S.uid || 0) + 1), b, p: 0, r, fx };
+  S.weapons.push(w);
+  return w;
+}
+export function ensureWeapons() {
+  if (!Array.isArray(S.weapons)) S.weapons = [];
+  if (!S.weapons.length) {
+    // 以前のセーブ：作った武器を1本ずつにする
+    for (const w of WEAPONS) if (w.id === 'rusty' || S.gear[w.id] || w.id === S.weapon) newWeapon(w.id);
+    const cur = S.weapons.find(w => w.b === S.weapon) || S.weapons[0];
+    S.wu = cur.u;
+  }
+  if (!S.weapons.some(w => w.u === S.wu)) S.wu = S.weapons[0].u;
+}
+export const weaponInst = () => S.weapons.find(w => w.u === S.wu) || S.weapons[0] || { u: 0, b: 'rusty', p: 0, r: 0, fx: [] };
+export const baseOf = w => WEAPONS.find(x => x.id === w.b) || WEAPONS[0];
+export const weaponOf = () => baseOf(weaponInst());
+export const fxOf = (w, k) => w.fx.reduce((a, [kk, v]) => a + (kk === k ? v : 0), 0);
+export const fx = k => fxOf(weaponInst(), k);
+// 武器の強さ（並べる・いちばん強いのを選ぶのに使う）
+export function wPower(w) {
+  const atk = baseOf(w).atk * (1 + w.p * ALCHEMY.plusAtk) * (1 + fxOf(w, 'atk') / 100);
+  return atk * (1 + (fxOf(w, 'crit') / 100) * 0.8 + fxOf(w, 'cdmg') / 400 + fxOf(w, 'spd') / 150 + fxOf(w, 'steal') / 30);
+}
 export const armorOf = () => ARMORS.find(a => a.id === S.armor) || ARMORS[0];
 
 export const S = {
@@ -27,6 +52,10 @@ export const S = {
   weapon: 'rusty', armor: 'cloth', gear: {},   // 身につけている装備と、作った装備
   book: { mon: {}, mat: {}, dish: {} },          // 図鑑
   requests: [],              // 住民の依頼
+  weapons: [], wu: 0, uid: 0, // 持っている武器と、身につけている武器
+  chest: { normal: 0, star: 0 },  // 宝箱
+  bossAt: {},                // ぬしを倒した時刻（復活まで）
+  tower: { best: 0 },        // 試練の塔
   day: 0.1,                  // 1日のうちの時刻（0〜1）
   cleared: {},
   bossDead: false,
@@ -38,7 +67,7 @@ export const S = {
 export function resetState() {
   const fresh = {
     ch: 1, coins: 0, earned: 0, up: { bag: 0, speed: 0, hp: 0 }, tool: { axe: 0, pick: 0 }, hired: [], lands: ['home'],
-    mission: 0, mp: 0, unlocked: {}, stations: {}, shop: { stock: { plank: 0, block: 0, jelly: 0 }, coins: 0 }, storage: {}, market: { stock: {}, coins: 0 }, bigmarket: { stock: {}, coins: 0 }, port: { stock: {}, coins: 0 }, inn: { fur: 0, coins: 0 }, bosses: {}, fac: {}, jobLv: {}, level: 1, xp: 0, weapon: 'rusty', armor: 'cloth', gear: {}, book: { mon: {}, mat: {}, dish: {} }, requests: [], day: 0.1, cleared: {}, bossDead: false,
+    mission: 0, mp: 0, unlocked: {}, stations: {}, shop: { stock: { plank: 0, block: 0, jelly: 0 }, coins: 0 }, storage: {}, market: { stock: {}, coins: 0 }, bigmarket: { stock: {}, coins: 0 }, port: { stock: {}, coins: 0 }, inn: { fur: 0, coins: 0 }, bosses: {}, fac: {}, jobLv: {}, level: 1, xp: 0, weapon: 'rusty', armor: 'cloth', gear: {}, book: { mon: {}, mat: {}, dish: {} }, requests: [], weapons: [], wu: 0, uid: 0, chest: { normal: 0, star: 0 }, bossAt: {}, tower: { best: 0 }, day: 0.1, cleared: {}, bossDead: false,
     time: 0, lastSeen: 0, stats: { sold: 0, kills: 0 },
   };
   for (const k in S) delete S[k];
@@ -66,16 +95,23 @@ export function loadState(d) {
     S.weapon = wmap[Math.min(sw, wmap.length - 1)]; S.armor = amap[Math.min(hp, amap.length - 1)];
     S.gear[S.weapon] = true; S.gear['a_' + S.armor] = true;
   }
+  S.chest = { normal: 0, star: 0, ...(d.chest || {}) };
+  ensureWeapons();
 }
 
 export const stat = {
   cap: () => UPGRADES.bag.values[S.up.bag],
   speed: () => UPGRADES.speed.values[S.up.speed],
   maxHp: () => 10 + (S.level - 1) * LEVEL.hpPer + armorOf().hp,
-  dmg: () => Math.round(weaponOf().atk * (1 + (S.level - 1) * LEVEL.atkPer) * 10) / 10,
+  dmg: () => { const w = weaponInst(); return Math.round(baseOf(w).atk * (1 + w.p * ALCHEMY.plusAtk) * (1 + fx('atk') / 100) * (1 + (S.level - 1) * LEVEL.atkPer) * 10) / 10; },
+  crit: () => PLAYER.crit + fx('crit') / 100,
+  critMul: () => PLAYER.critMul + fx('cdmg') / 100,
+  steal: () => fx('steal') / 100,
+  dropBonus: () => PLAYER.dropBonus + fx('drop') / 100,
+  xpMul: () => 1 + fx('xp') / 100,
   def: () => armorOf().def,
   power: tool => TOOLS[tool] ? TOOLS[tool].values[S.tool[tool]] : 1,
-  swing: tool => tool === 'sword' ? 0.42 - WEAPONS.indexOf(weaponOf()) * 0.022 : TOOLS[tool] ? TOOLS[tool].swing[S.tool[tool]] : 0.35,
+  swing: tool => tool === 'sword' ? (0.42 - WEAPONS.indexOf(weaponOf()) * 0.022) / (1 + fx('spd') / 100) : TOOLS[tool] ? TOOLS[tool].swing[S.tool[tool]] : 0.35,
 };
 
 export function rankScore(pop, buildings) {

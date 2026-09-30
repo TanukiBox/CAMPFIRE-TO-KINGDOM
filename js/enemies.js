@@ -34,14 +34,16 @@ export class Enemies {
   spawn(type, zone, opts = {}) {
     const def = ENEMY_TYPES[type];
     const land = this.world.landOf(zone.x, zone.z);
-    const rect = land ? this.world.land(land).rect : this.world.home;
+    const rect = opts.rect || (land ? this.world.land(land).rect : this.world.home);
     const e = {
       id: (this.nextId = (this.nextId || 0) + 1), type, def, zone, land, area: this.world.insetRects([rect]), rect,
       hp: def.hp, alive: true, state: 'spawn', t: Math.random() * 0.3,
       x: 0, z: 0, yaw: Math.random() * 6.28, tx: 0, tz: 0, wait: Math.random() * 2, hop: Math.random(), hopY: 0, walk: 0, cd: 0,
       kx: 0, kz: 0, flash: 0, color: new THREE.Color(opts.color ?? def.color).offsetHSL((Math.random() - 0.5) * 0.04, 0, (Math.random() - 0.5) * 0.08),
       passive: !!opts.passive, minion: !!opts.minion, respawnT: 0, r: def.radius * def.size,
+      tower: !!opts.tower, mul: opts.mul || 1, maxHp: def.hp * (opts.hpMul || 1), aggro: opts.aggro || def.aggro,
     };
+    e.hp = e.maxHp;
     if (opts.x !== undefined) { e.x = opts.x; e.z = opts.z; e.tx = e.x; e.tz = e.z; } else this.place(e);
     if (def.boss) { this.bosses.push(e); e.phase = 'idle'; e.pt = 0; e.cycles = 0; e.fight = false; }
     this.list.push(e);
@@ -77,7 +79,8 @@ export class Enemies {
     if (!e.def.boss) e.cd = Math.max(e.cd, 0.5);
     if (e.hp <= 0) {
       e.alive = false; e.respawnT = e.def.respawn; e.dieT = 0.16;
-      if (e.minion) this.list.splice(this.list.indexOf(e), 1);
+      if (e.minion || e.tower) this.list.splice(this.list.indexOf(e), 1);
+      if (e.tower && this.bosses.includes(e)) this.bosses.splice(this.bosses.indexOf(e), 1);
       return true;
     }
     return false;
@@ -87,9 +90,20 @@ export class Enemies {
   resetBoss() {
     for (const b of this.bosses) {
       if (!b.alive) continue;
-      b.hp = b.def.hp; b.phase = 'idle'; b.fight = false; b.x = b.zone.x; b.z = b.zone.z; b.hopY = 0;
+      b.hp = b.maxHp; b.phase = 'idle'; b.fight = false; b.x = b.zone.x; b.z = b.zone.z; b.hopY = 0;
     }
     for (let i = this.list.length - 1; i >= 0; i--) if (this.list[i].minion) this.list.splice(i, 1);
+  }
+  clearTower() {
+    this.list = this.list.filter(e => !e.tower);
+    this.bosses = this.bosses.filter(e => !e.tower);
+  }
+  towerLeft() { return this.list.filter(e => e.tower && e.alive).length; }
+
+  // 時間がたったぬしを元のすみかに戻す
+  reviveBoss(b) {
+    b.alive = true; b.hp = b.maxHp || b.def.hp; b.phase = 'idle'; b.fight = false; b.pt = 0; b.cycles = 0;
+    b.x = b.zone.x; b.z = b.zone.z; b.hopY = 0; b.state = 'spawn'; b.t = 0; b.dieT = 0; b.kx = b.kz = 0;
   }
   bossOf(type) { return this.bosses.find(b => b.type === type) || null; }
 
@@ -102,7 +116,7 @@ export class Enemies {
         if (e.dieT > 0) { e.dieT -= dt; e.x += (e.kx || 0) * dt * 0.5; e.z += (e.kz || 0) * dt * 0.5; }
         if (def.boss || e.minion) continue;
         e.respawnT -= dt;
-        if (e.respawnT <= 0) { e.alive = true; e.hp = def.hp; e.state = 'spawn'; e.t = 0; this.place(e); }
+        if (e.respawnT <= 0) { e.alive = true; e.hp = e.maxHp; e.state = 'spawn'; e.t = 0; this.place(e); }
         continue;
       }
       e.flash = Math.max(0, e.flash - dt);
@@ -115,12 +129,12 @@ export class Enemies {
 
       const dxp = P.x - e.x, dzp = P.z - e.z, dp = Math.hypot(dxp, dzp);
       const homeD = Math.hypot(P.x - e.zone.x, P.z - e.zone.z);
-      const chase = !e.passive && player.alive && playerLand === e.land && dp < def.aggro && homeD < e.zone.r + def.leash;
+      const chase = !e.passive && player.alive && playerLand === e.land && dp < e.aggro && homeD < e.zone.r + def.leash;
       e.chasing = chase;
       let speed = 0, tx, tz;
       if (chase) {
         tx = P.x; tz = P.z; speed = dp > def.atkRange * 0.8 ? def.chase : 0;
-        if (dp < def.atkRange + e.r * 0.3 && e.cd <= 0) { player.damage(def.dmg, e.x, e.z); e.cd = def.atkCd; e.hop = 0.25; e.lunge = 0.3; }
+        if (dp < def.atkRange + e.r * 0.3 && e.cd <= 0) { player.damage(def.dmg * (e.mul || 1), e.x, e.z); e.cd = def.atkCd; e.hop = 0.25; e.lunge = 0.3; }
       } else {
         e.wait -= dt;
         if (e.wait <= 0) {
@@ -191,7 +205,7 @@ export class Enemies {
     const inside = player.alive && playerLand === e.land && this.world.isWalk(e.land);
     const dp = Math.hypot(P.x - e.x, P.z - e.z);
     if (!e.fight) {
-      if (inside && dp < def.aggro) { e.fight = true; e.phase = 'chase'; e.pt = 0; e.introT = 2.2; hooks.onBossStart(e); }
+      if (inside && dp < e.aggro) { e.fight = true; e.phase = 'chase'; e.pt = 0; e.introT = 2.2; hooks.onBossStart(e); }
       else { this.move(e, dt, 0, e.x, e.z, false); return; }
     }
     if (!inside) { e.fight = false; e.phase = 'idle'; hooks.onBossEnd(e); return; }
@@ -200,7 +214,7 @@ export class Enemies {
     e.pt += dt;
     if (e.phase === 'chase') {
       this.move(e, dt, def.chase, P.x, P.z, true);
-      if (dp < def.atkRange + e.r * 0.5 && e.cd <= 0) { player.damage(def.dmg, e.x, e.z); e.cd = def.atkCd; e.lunge = 0.3; }
+      if (dp < def.atkRange + e.r * 0.5 && e.cd <= 0) { player.damage(def.dmg * (e.mul || 1), e.x, e.z); e.cd = def.atkCd; e.lunge = 0.3; }
       if (e.pt > 3.2) {
         const atk = def.attacks[e.cycles % def.attacks.length];
         e.pt = 0; if (!def.fly) e.hopY = 0;
@@ -225,7 +239,7 @@ export class Enemies {
       // 火を吹く：前方の細長い範囲にいるとダメージ
       const px = P.x - e.x, pz = P.z - e.z;
       const along = px * e.ddx + pz * e.ddz, side = Math.abs(px * e.ddz - pz * e.ddx);
-      if (player.alive && along > 0.3 && along < 8.5 && side < 1.4) player.damage(def.breathDmg, e.x, e.z);
+      if (player.alive && along > 0.3 && along < 8.5 && side < 1.4) player.damage(def.breathDmg * (e.mul || 1), e.x, e.z);
       hooks.onBreathTick(e, dt);
       if (e.pt > 1.3) { e.phase = 'rest'; e.pt = 0; e.cycles++; if (e.cycles % 3 === 0) hooks.onBossCall(e); }
     } else if (e.phase === 'throwwind') {
@@ -233,7 +247,7 @@ export class Enemies {
       if (e.pt > 0.8) {
         e.phase = 'rest'; e.pt = 0; e.cycles++;
         const targets = [[0, 0], [2.2, 1.2], [-2.2, 1.2]].map(([ox, oz]) => ({ x: P.x + ox * (Math.random() + 0.5), z: P.z + oz * (Math.random() + 0.5) - 0.6 }));
-        targets.forEach((tg, i) => this.rocks.push({ fx: e.x, fz: e.z, fy: 3.5, tx: tg.x, tz: tg.z, t: -i * 0.15, dur: 1.1, mesh: null, fire: !!def.fire, dmg: def.rockDmg }));
+        targets.forEach((tg, i) => this.rocks.push({ fx: e.x, fz: e.z, fy: 3.5, tx: tg.x, tz: tg.z, t: -i * 0.15, dur: 1.1, mesh: null, fire: !!def.fire, dmg: def.rockDmg * (e.mul || 1) }));
         hooks.onBossThrow(e, targets);
         if (e.cycles % 3 === 0) hooks.onBossCall(e);
       }
@@ -242,7 +256,7 @@ export class Enemies {
       if (e.pt > 0.75) { e.phase = 'dash'; e.pt = 0; hooks.onBossDash(e); }
     } else if (e.phase === 'dash') {
       e.x += e.ddx * 11 * dt; e.z += e.ddz * 11 * dt; e.walk += dt * 20;
-      if (!e.dashHit && Math.hypot(P.x - e.x, P.z - e.z) < e.r + 0.7) { e.dashHit = true; player.damage(def.dashDmg, e.x, e.z); }
+      if (!e.dashHit && Math.hypot(P.x - e.x, P.z - e.z) < e.r + 0.7) { e.dashHit = true; player.damage(def.dashDmg * (e.mul || 1), e.x, e.z); }
       if (e.pt > 0.6) { e.phase = 'rest'; e.pt = 0; e.cycles++; if (e.cycles % 3 === 0) hooks.onBossCall(e); }
     } else if (e.phase === 'charge') {
       this.face(e, P.x - e.x, P.z - e.z, dt);
@@ -259,7 +273,7 @@ export class Enemies {
         e.hopY = 0; e.phase = 'rest'; e.pt = 0; e.cycles++;
         const hitP = Math.hypot(P.x - e.x, P.z - e.z) < def.slamR;
         hooks.onBossSlam(e, hitP);
-        if (hitP) player.damage(def.slamDmg, e.x, e.z);
+        if (hitP) player.damage(def.slamDmg * (e.mul || 1), e.x, e.z);
         if (e.cycles % (def.attacks.length > 1 ? 3 : 2) === 0) hooks.onBossCall(e);
       }
     } else if (e.phase === 'rest') {

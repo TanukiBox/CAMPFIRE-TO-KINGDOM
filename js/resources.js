@@ -30,7 +30,9 @@ export class Resources {
       if (out < 1.6) continue;
       if (world.sea && z > world.sea - 1.5) continue; // 海には置かない
       if (z > f.z1 && z < f.z1 + 18) continue; // 手前（画面の下）はカメラをふさぐので置かない
-      decor.push({ type: r() < 0.12 ? 'rock' : 'tree', x, z, y: world.heightAt(x, z), rot: r() * Math.PI * 2, scl: 0.9 + r() * 0.5, pine: r() < 0.5 });
+      // 草のない狩り場のそばは木ではなく大きな岩
+      const og = world.outerGround(x, z, 12), bare = og && !og.grass;
+      decor.push({ type: bare || r() < 0.12 ? 'rock' : 'tree', x, z, y: world.heightAt(x, z), rot: r() * Math.PI * 2, scl: bare ? 1.3 + r() * 1.2 : 0.9 + r() * 0.5, pine: r() < 0.5 });
     }
     const trees = this.nodes.filter(n => n.type === 'tree');
     const dTrees = decor.filter(d => d.type === 'tree'), dRocks = decor.filter(d => d.type === 'rock');

@@ -1,10 +1,11 @@
 // 焚き火から王国へ — 全体のつなぎ込みと毎フレームの処理
 import * as THREE from './lib/three.module.min.js';
 import { renderer, scene, camera, resize, placeCamera, perfTick, perfReset, perf, quality, Blobs, params, setDay } from './gfx.js';
-import { CHAPTERS, MATERIALS, UPGRADES, TOOLS, JOBS, SHOP, PLAYER, FACILITY, JOB_UP, STORAGE, INGREDIENTS, WEAPONS, ARMORS, LEVEL, REQUESTS, chapterData, LAST_CHAPTER } from './data.js';
+import { CHAPTERS, MATERIALS, UPGRADES, TOOLS, JOBS, SHOP, PLAYER, FACILITY, JOB_UP, STORAGE, INGREDIENTS, WEAPONS, ARMORS, LEVEL, REQUESTS, AFFIXES, RARITY, CHEST, ALCHEMY, BOSS, TOWER, chapterData, LAST_CHAPTER } from './data.js';
 import { initMusic, play as playMusic, setMusic } from './music.js';
-import { S, stat, loadState, resetState, rankScore, rankOf, weaponOf, armorOf } from './state.js';
+import { S, stat, loadState, resetState, rankScore, rankOf, weaponOf, armorOf, ensureWeapons, newWeapon, weaponInst, baseOf, wPower, fxOf } from './state.js';
 import { Requests } from './requests.js';
+import { TowerArena, ARENA } from './tower.js';
 import { World } from './world.js';
 import { Resources } from './resources.js';
 import { Items } from './items.js';
@@ -44,6 +45,7 @@ playMusic('title');
 const vib = p => { if (settings.vibrate && navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) try { navigator.vibrate(p); } catch (e) { /* なし */ } };
 const chapterTrack = () => 'ch' + Math.min(S.ch, 4);
 if (hasSave) loadState(save.state);
+ensureWeapons();
 // 前の章をクリアしていて次の章があれば、次の章から
 if (S.cleared[S.ch] && CHAPTERS[S.ch + 1]) { S.ch++; S.mission = 0; S.mp = 0; S.missionId = null; }
 const ch = chapterData(S.ch);
@@ -68,11 +70,12 @@ for (const k of ['plank', 'block', 'jelly']) if (S.shop.stock[k]) { S.storage[k]
 const workers = new Workers(world, builds, resources, stations, items, enemies);
 const missions = new Missions(ch.missions);
 const requests = new Requests(ch, builds, stations);
+const arena = new TowerArena();
 world.addTown(ch.towns);
 world.decorate([...builds.areas(), ...roadAreas(ch.towns)]);
 const blobs = new Blobs(520);
 const people = new Rig(villagerParts(), 160);
-for (const b of enemies.bosses) if (S.bosses[b.type]) b.alive = false;
+for (const b of enemies.bosses) if (S.bosses[b.type]) { b.alive = false; if (S.bossAt[b.type] === undefined) S.bossAt[b.type] = S.time; }
 
 player.pos.set(ch.start[0], 0, ch.start[1]);
 if (hasSave && typeof save.px === 'number') { player.pos.set(save.px, 0, save.pz); world.resolve(player.pos, 0.36); }
@@ -169,8 +172,9 @@ player.hooks = {
     if (kind === 'enemy') {
       unlockThing('hp');
       // 会心の一撃（ときどき2倍・大きく吹っ飛ぶ）
-      const crit = Math.random() < PLAYER.crit;
-      const dmg = Math.round(stat.dmg() * (crit ? PLAYER.critMul : 1) * 10) / 10;
+      const crit = Math.random() < stat.crit();
+      const dmg = Math.round(stat.dmg() * (crit ? stat.critMul() : 1) * 10) / 10;
+      if (stat.steal() > 0 && player.hp < player.maxHp) player.hp = Math.min(player.maxHp, player.hp + dmg * stat.steal());
       const killed = enemies.hit(target, dmg, px, pz, crit ? 1.8 : 1);
       const hy = 0.55 * target.def.size + (target.hopY || 0);
       if (crit) {
@@ -215,6 +219,7 @@ player.hooks = {
   },
   onDown() {
     sfx.down(); shake(0.35);
+    if (tower.active) { towerDown(); return; }
     const n = items.dropHalf(player);
     enemies.resetBoss();
     hud.bossBar(null, null);
@@ -246,15 +251,15 @@ function onKill(e, byWorker = false) {
   const y = 0.4 * def.size;
   burst(e.x, y, e.z, { n: def.boss ? 60 : 18, color: e.color.getHex(), speed: def.boss ? 7 : 4, up: 5, size: def.boss ? 0.3 : 0.16, life: 0.9 });
   ring(e.x, e.z, 0xffffff, def.boss ? 6 : 1.6, 0.4);
-  if (!e.minion) {
+  if (!e.minion && !e.tower) {
     // 兵士が倒した分は、倉庫があれば倉庫へ直接しまう
     const total = Object.values(S.storage).reduce((a, b) => a + b, 0);
     if (byWorker && stations.storageReady() && total < stations.storageCap()) {
       for (const k in def.drop) { S.storage[k] = (S.storage[k] || 0) + def.drop[k]; S.book.mat[k] = 1; }
       floatText('📦', e.x, 1.4, e.z, 'coin');
-    } else for (const k in def.drop) popDrops(k, def.drop[k] + (!def.boss && Math.random() < PLAYER.dropBonus ? 1 : 0), e.x, e.z, 0.5 + y);
+    } else for (const k in def.drop) popDrops(k, def.drop[k] + (!def.boss && Math.random() < stat.dropBonus() ? 1 : 0), e.x, e.z, 0.5 + y);
   }
-  if (!e.minion && def.coins) {
+  if (!e.minion && !e.tower && def.coins) {
     const pieces = Math.min(8, def.coins);
     for (let i = 0; i < pieces; i++) {
       const part = i === pieces - 1 ? def.coins - Math.floor(def.coins / pieces) * (pieces - 1) : Math.floor(def.coins / pieces);
@@ -268,8 +273,21 @@ function onKill(e, byWorker = false) {
   // 図鑑と経験値（兵士が倒した分は少し）
   S.book.mon[e.type] = (S.book.mon[e.type] || 0) + 1;
   unlockThing('book', 'unlock_book');
-  gainXp(def.xp * (e.minion ? 0.5 : byWorker ? 0.3 : 1) * (byWorker ? 1 : 1 + Math.min(0.5, (chain - 1) * 0.1)), e.x, e.z);
-  if (def.boss) {
+  gainXp(def.xp * (e.minion ? 0.5 : byWorker ? 0.3 : 1) * (byWorker ? 1 : (1 + Math.min(0.5, (chain - 1) * 0.1)) * stat.xpMul()) * (e.mul || 1), e.x, e.z);
+  // 宝箱（ぬしは必ず、ほかはまれに）
+  if (!byWorker && !e.minion) {
+    const n = def.boss ? CHEST.bossDrop : Math.random() < CHEST.drop ? 1 : 0;
+    if (n) {
+      S.chest.normal += n;
+      floatText('🎁', e.x, 2.2 * def.size, e.z, 'coin');
+      sfx.unlock();
+      hud.toast(`🎁 ${t('chestGot', { n })}`, 'good');
+      unlockThing('adv', 'unlock_adv');
+      hud.newDot('btnAdv', true);
+    }
+  }
+  if (def.boss && !e.tower) S.bossAt[e.type] = S.time;
+  if (def.boss && !e.tower) {
     S.bosses[e.type] = true;
     playMusic(chapterTrack());
     vib([60, 40, 120]);
@@ -417,7 +435,7 @@ const bossHooks = {
   onBossCall(e) {
     for (let i = 0; i < 2; i++) {
       const a = Math.random() * 6.28, x = e.x + Math.cos(a) * 2.5, z = e.z + Math.sin(a) * 2.5;
-      const m = enemies.spawn(e.def.minion, { x, z, r: 1 }, { minion: true, x, z });
+      const m = enemies.spawn(e.def.minion, { x, z, r: 1 }, { minion: true, x, z, ...(e.tower ? { tower: true, rect: e.rect, mul: e.mul, hpMul: e.mul, aggro: 30 } : {}) });
       burst(x, 0.4, z, { n: 8, color: m.color.getHex(), speed: 2, up: 3, size: 0.12, life: 0.5 });
       m.cd = 1;
     }
@@ -549,13 +567,13 @@ const game = {
   // 鍛冶屋で装備を作る（作ったら強いほうを自動で身につける）
   craft(kind, id) {
     const list = kind === 'w' ? WEAPONS : ARMORS, g = list.find(x => x.id === id), key = kind === 'w' ? id : 'a_' + id;
-    if (!g || !g.cost || S.gear[key]) return;
+    if (!g || !g.cost || (kind === 'a' && S.gear[key])) return;
     const c = g.cost;
     if (S.coins < c.coin) return;
     for (const m in c) if (m !== 'coin' && game.bagCount(m) < c[m]) return;
     for (const m in c) if (m !== 'coin') stations.useMaterial(player, m, c[m]);
     S.coins -= c.coin; S.gear[key] = true;
-    if (kind === 'w' && list.indexOf(g) > list.indexOf(weaponOf())) S.weapon = id;
+    if (kind === 'w') { const w = newWeapon(id); if (wPower(w) > wPower(weaponInst())) S.wu = w.u; }
     if (kind === 'a' && list.indexOf(g) > list.indexOf(armorOf())) S.armor = id;
     player.applyStats();
     missions.event('craft');
@@ -568,13 +586,84 @@ const game = {
   },
   // 作った装備から選んで身につける
   equip(kind, id) {
-    const list = kind === 'w' ? WEAPONS : ARMORS, g = list.find(x => x.id === id);
-    if (!g || (g.cost && !S.gear[kind === 'w' ? id : 'a_' + id])) return;
-    if (kind === 'w') S.weapon = id; else S.armor = id;
+    if (kind === 'w') { const w = S.weapons.find(x => x.u === +id); if (!w) return; S.wu = w.u; S.weapon = w.b; }
+    else { const g = ARMORS.find(x => x.id === id); if (!g || (g.cost && !S.gear['a_' + id])) return; S.armor = id; }
     player.applyStats();
     player.hp = Math.min(player.hp, player.maxHp);
     sfx.swap();
     saveNow();
+  },
+  // いらない武器を分解してコインに（効果が2つ以上なら星のかけらも）
+  dismantle(u) {
+    const i = S.weapons.findIndex(w => w.u === +u);
+    if (i < 0 || S.weapons[i].u === S.wu) return;
+    const w = S.weapons[i], tier = WEAPONS.findIndex(x => x.id === w.b);
+    S.weapons.splice(i, 1);
+    const coinsBack = (tier + 1) * 30 * (1 + w.r) * (1 + w.p);
+    addCoins(coinsBack);
+    if (w.r >= 2) S.storage.star = (S.storage.star || 0) + (w.r - 1);
+    sfx.anvil();
+    hud.toast(`🔨 ${t('dismantled', { c: coinsBack })}${w.r >= 2 ? ` ${iconImg('star')}+${w.r - 1}` : ''}`, 'good');
+    saveNow();
+  },
+  // 錬金：同じ武器をもう1本使って +1。使った武器の効果を1つ受けつぐ
+  alchemyCost(w) { const tier = WEAPONS.findIndex(x => x.id === w.b); return { coin: ALCHEMY.coin * (tier + 1) * (w.p + 1), star: ALCHEMY.star * (w.p + 1) }; },
+  alchemy(u, fu) {
+    const w = S.weapons.find(x => x.u === +u), f = S.weapons.find(x => x.u === +fu);
+    if (!w || !f || w === f || w.b !== f.b || w.p >= ALCHEMY.maxPlus || f.u === S.wu) return;
+    const c = game.alchemyCost(w);
+    if (S.coins < c.coin || game.bagCount('star') < c.star) return;
+    S.coins -= c.coin; stations.useMaterial(player, 'star', c.star);
+    S.weapons.splice(S.weapons.indexOf(f), 1);
+    w.p = Math.max(w.p, f.p) + 1;
+    const gain = f.fx.filter(([k]) => !w.fx.some(([kk]) => kk === k));
+    let got = null;
+    if (gain.length && w.fx.length < 3) { got = gain[Math.floor(Math.random() * gain.length)]; w.fx.push(got); w.r = Math.max(w.r, w.fx.length); }
+    player.applyStats();
+    sfx.anvil(); setTimeout(() => sfx.unlock(), 200); vib(40);
+    const a = stations.anvil.pos;
+    burst(a.x, 1.2, a.z, { n: 40, colors: [0xb58ae0, 0xffe066, 0xffffff, 0x8fd3ff], speed: 4, up: 6, size: 0.1, life: 0.9 });
+    hud.toast(`✨ ${t('alchemyDone', { x: t('w_' + w.b), n: w.p })}${got ? ' ' + t('fxGot', { f: t('fx_' + got[0], { v: got[1] }) }) : ''}`, 'good');
+    saveNow();
+  },
+  // 宝箱
+  chestPrice: () => CHEST.coin[Math.min(S.ch, 4)],
+  buyChest(kind) {
+    if (kind === 'star') { if (game.bagCount('star') < CHEST.starPrice) return; stations.useMaterial(player, 'star', CHEST.starPrice); }
+    else { const p = game.chestPrice(); if (S.coins < p) return; S.coins -= p; }
+    S.chest[kind]++;
+    sfx.coin();
+    saveNow();
+  },
+  openChest(kind) {
+    if (!(S.chest[kind] > 0)) return null;
+    S.chest[kind]--;
+    const T = CHEST.table[kind], roll = Math.random() * (T.coins + T.mat + T.weapon);
+    let res;
+    if (roll < T.coins) {
+      const n = Math.round(game.chestPrice() * (0.5 + Math.random() * 0.9) / 10) * 10;
+      addCoins(n); res = { type: 'coins', n };
+    } else if (roll < T.coins + T.mat) {
+      const pool = Object.keys(S.book.mat).filter(k => MATERIALS[k] && !MATERIALS[k].dish && (MATERIALS[k].price || 0) >= 3);
+      const k = pool.length ? pool[Math.floor(Math.random() * pool.length)] : 'jelly';
+      const n = Math.max(2, Math.min(12, Math.round(45 / (MATERIALS[k].price || 3) * (0.6 + Math.random() * 0.8))));
+      S.storage[k] = (S.storage[k] || 0) + n; S.book.mat[k] = 1;
+      res = { type: 'mat', k, n };
+    } else {
+      let x = Math.random() * 100, r = 0;
+      for (let i = 0; i < T.rar.length; i++) { if (x < T.rar[i]) { r = i; break; } x -= T.rar[i]; }
+      // 宝箱の武器は、その章で作れる武器より少し下まで（星の宝箱は1つ上まで）
+      const top = Math.min(WEAPONS.length - 1, S.ch * 2 - 1 + (kind === 'star' ? 1 : 0));
+      const tier = Math.max(1, top - Math.floor(Math.pow(Math.random(), 1.6) * 3));
+      const keys = Object.keys(AFFIXES).sort(() => Math.random() - 0.5).slice(0, RARITY[r].fx);
+      const fx = keys.map(k => { const A = AFFIXES[k], lo = r >= 3 ? (A.min + A.max) / 2 : A.min; return [k, Math.round(lo + Math.random() * (A.max - lo))]; });
+      const w = newWeapon(WEAPONS[tier].id, r, fx);
+      S.gear[w.b] = true;
+      res = { type: 'weapon', u: w.u, better: wPower(w) > wPower(weaponInst()) };
+    }
+    sfx.unlock(); setTimeout(() => sfx.fanfare(), 250); vib([30, 30, 60]);
+    saveNow();
+    return res;
   },
   hire(job) {
     const j = JOBS[job];
@@ -599,6 +688,13 @@ const game = {
     setTimeout(() => location.reload(), 600);
   },
   onClose() { perfReset(); },
+  // 試練の塔
+  towerOpen: () => towerOpen(),
+  towerStart: () => { const b = S.tower.best || 0; return b >= 5 ? Math.floor(b / 5) * 5 + 1 : 1; },
+  towerEnter: n => towerEnter(n),
+  towerNext() { ui.close(); setTimeout(() => towerFloor(tower.floor + 1), 400); },
+  towerLeave() { ui.close(); hud.fade(true); setTimeout(() => towerExit(`🗼 ${t('towerBack', { n: tower.floor })}`), 600); },
+  inTower: () => tower.active,
 };
 ui.init(game);
 function openSmithy() { unlock(); ui.show('smithy'); }
@@ -638,6 +734,12 @@ function eatJelly(dt) {
 
 // ---- ミッション ----
 function missionTick() {
+  for (const b of enemies.bosses) {
+    if (b.alive || b.tower || !S.bosses[b.type] || !world.isWalk(b.land)) continue;
+    if (S.time - (S.bossAt[b.type] ?? S.time) < BOSS.respawn) continue;
+    enemies.reviveBoss(b);
+    hud.toast(`👑 ${t('bossBack', { b: t('boss_' + b.type) })}`, 'bad');
+  }
   const ctx = { builds, rank: rankNow(), allCrafted: allCrafted() };
   for (const it of player.bag) S.book.mat[it.kind] = 1;
   const done = missions.check(ctx);
@@ -711,6 +813,79 @@ function missionTarget() {
     case 'boss': { const b = enemies.bossOf(m.kind); return b && b.alive ? { x: b.x, z: b.z, y: 2 + b.def.size * 0.8 } : null; }
     default: return null;
   }
+}
+
+// ---- 試練の塔 ----
+const tower = { active: false, floor: 0, cleared: false, spawnT: 0 };
+const towerOpen = () => S.ch >= 2 || !!S.cleared[1];
+const towerRect = { x0: ARENA.x - ARENA.r, x1: ARENA.x + ARENA.r, z0: ARENA.z - ARENA.r, z1: ARENA.z + ARENA.r };
+function towerEnter(start) {
+  if (tower.active || !towerOpen()) return;
+  ui.close();
+  arena.build();
+  hud.fade(true);
+  setTimeout(() => {
+    tower.active = true;
+    world.setExtra({ id: 'tower', rect: towerRect, hunt: true });
+    player.pos.set(ARENA.x, 0, ARENA.z + 7); player.yaw = Math.PI; player.hp = player.maxHp; player.invul = 1;
+    camTarget.copy(player.pos);
+    playMusic('boss');
+    hud.fade(false);
+    towerFloor(start);
+  }, 600);
+}
+function towerFloor(n) {
+  tower.floor = n; tower.cleared = false;
+  const boss = n % 5 === 0, tier = Math.min(TOWER.waves.length - 1, Math.floor((n - 1) / 5));
+  const over = Math.max(0, n - 20);   // 20階より上はどんどん強く
+  const hpMul = (1 + (n - 1 - tier * 5) * TOWER.hpUp) * (1 + over * 0.12), mul = (1 + (n - 1 - tier * 5) * TOWER.dmgUp) * (1 + over * 0.06);
+  hud.toast(`🗼 ${t('towerFloor', { n })}${boss ? ' 👑' : ''}`, boss ? 'bad' : 'good');
+  const at = (r) => { const a = Math.random() * Math.PI * 2, d = 2 + Math.random() * r; return { x: ARENA.x + Math.cos(a) * d, z: ARENA.z - 1 + Math.sin(a) * d * 0.8 }; };
+  if (boss) {
+    const type = TOWER.bosses[Math.floor(n / 5 - 1) % TOWER.bosses.length];
+    const p = { x: ARENA.x, z: ARENA.z - 4 };
+    enemies.spawn(type, { ...p, r: 3 }, { tower: true, rect: towerRect, hpMul: hpMul * 0.8, mul, aggro: 30, ...p });
+  } else {
+    const list = TOWER.waves[tier], cnt = Math.min(10, 3 + Math.floor(n / 2));
+    for (let i = 0; i < cnt; i++) {
+      const p = at(7);
+      enemies.spawn(list[Math.floor(Math.random() * list.length)], { ...p, r: 4 }, { tower: true, rect: towerRect, hpMul, mul, aggro: 30, ...p });
+    }
+  }
+}
+function towerTick() {
+  if (!tower.active || tower.cleared || !player.alive) return;
+  if (enemies.towerLeft() > 0) return;
+  tower.cleared = true;
+  const n = tower.floor, boss = n % 5 === 0;
+  const coinsGot = TOWER.coins * n, xp = TOWER.xp * n, stars = boss ? TOWER.bossStar + Math.floor(n / 10) : TOWER.star;
+  S.tower.best = Math.max(S.tower.best || 0, n);
+  addCoins(coinsGot);
+  S.storage.star = (S.storage.star || 0) + stars; S.book.mat.star = 1;
+  if (boss) S.chest.star++;
+  gainXp(xp);
+  sfx.fanfare(); vib([40, 30, 80]);
+  burst(player.pos.x, 2, player.pos.z, { n: 50, colors: [0xb58ae0, 0xffe066, 0xffffff, 0x8fd3ff], speed: 6, up: 6, size: 0.14, life: 1.2 });
+  saveNow();
+  setTimeout(() => ui.show('tclear', { n, coins: coinsGot, xp, stars, chest: boss ? 1 : 0 }), 900);
+}
+function towerExit(msg) {
+  tower.active = false;
+  if (ui.open === 'tclear') ui.close();
+  enemies.clearTower(); enemies.clearRocks();
+  hud.bossBar(null, null); warn.visible = false; warnLine.visible = false;
+  world.setExtra(null);
+  player.respawn(ch.start[0], ch.start[1]);
+  camTarget.copy(player.pos);
+  playMusic(chapterTrack());
+  hud.fade(false);
+  if (msg) hud.toast(msg);
+  saveNow();
+}
+function towerDown() {
+  const n = tower.floor;
+  setTimeout(() => hud.fade(true), 700);
+  setTimeout(() => towerExit(`🗼 ${t('towerDown', { n, b: S.tower.best || 0 })}`), 1500);
 }
 
 // ---- 章クリア ----
@@ -841,7 +1016,7 @@ function saveNow() {
     v: 2, state: S,
     builds: builds.toSave(),
     bag: player.bag.map(it => it.kind),
-    hp: Math.round(player.hp * 10) / 10, px: Math.round(player.pos.x * 100) / 100, pz: Math.round(player.pos.z * 100) / 100,
+    hp: Math.round(player.hp * 10) / 10, px: tower.active ? ch.start[0] : Math.round(player.pos.x * 100) / 100, pz: tower.active ? ch.start[1] : Math.round(player.pos.z * 100) / 100,
     settings,
   }, SLOT);
   dirty = false;
@@ -907,12 +1082,14 @@ $('btnAway').addEventListener('click', () => {
 $('btnUpgrade').addEventListener('click', () => { unlock(); hud.newDot('btnUpgrade', false); ui.show('upgrade'); });
 $('btnHire').addEventListener('click', () => { unlock(); hud.newDot('btnHire', false); ui.show('hire'); });
 $('bagPill').addEventListener('click', () => { if (!started || ending) return; unlock(); ui.show('bag'); });
+$('btnAdv').addEventListener('click', () => { unlock(); hud.newDot('btnAdv', false); ui.show('adv'); });
 $('btnStore').addEventListener('click', () => { unlock(); hud.newDot('btnStore', false); ui.show('store'); });
 $('btnBook').addEventListener('click', () => { unlock(); hud.newDot('btnBook', false); ui.show('book'); });
 onFirstTouch(unlock);
 window.addEventListener('resize', resize);
 if (S.stats.kills > 0) S.unlocked.book = true;
 if (stations.storageReady()) S.unlocked.store = true;
+if (S.chest.normal + S.chest.star > 0 || S.ch >= 2) S.unlocked.adv = true;
 hud.gates(S.unlocked, false);
 
 // ---- はじめる ----
@@ -971,7 +1148,7 @@ if (stressN > 0) {
 }
 const showFps = stressN > 0 || params.has('fps');
 // 動作確認用：ctk.step(秒) で画面を描かずに時間を進められる
-if (DEBUG) window.ctk = { S, player, requests, gainXp: n => gainXp(n), game, items, builds, resources, enemies, world, stations, workers, missions, startEnding: () => startEnding(), step: sec => { for (let i = 0; i < sec * 30; i++) tick(1 / 30, false); } };
+if (DEBUG) window.ctk = { S, player, requests, tower, towerEnter: n => towerEnter(n), towerFloor: n => towerFloor(n), gainXp: n => gainXp(n), game, items, builds, resources, enemies, world, stations, workers, missions, startEnding: () => startEnding(), step: sec => { for (let i = 0; i < sec * 30; i++) tick(1 / 30, false); } };
 
 // ---- 毎フレーム ----
 const move = { x: 0, z: 0, m: 0 };
@@ -1042,6 +1219,7 @@ function tick(raw, show) {
   storageFullT = Math.max(0, storageFullT - fdt);
   coins.update(fdt);
   world.update(time, fdt);
+  if (tower.active) arena.update(time);
   updateFx(fdt);
 
   // 予告の円
@@ -1085,11 +1263,11 @@ function tick(raw, show) {
   hud.coins(S.coins);
   hud.level(S.level, S.xp / LEVEL.need(S.level));
   hud.rank(rankNow(), chapterName(), workers.list.length);
-  for (const boss of enemies.bosses) if (boss.alive && boss.fight) hud.bossBar(t('boss_' + boss.type), boss.hp / boss.def.hp);
+  for (const boss of enemies.bosses) if (boss.alive && boss.fight) hud.bossBar(t('boss_' + boss.type), boss.hp / boss.maxHp);
   drawLabels();
   hud.moveHint(started && !input.moved);
   missionT -= fdt;
-  if (missionT <= 0 && started) { missionT = 0.2; missionTick(); }
+  if (missionT <= 0 && started) { missionT = 0.2; missionTick(); towerTick(); }
   if (showFps) {
     fpsT -= fdt;
     if (fpsT <= 0) {
@@ -1102,7 +1280,13 @@ function tick(raw, show) {
 
 function drawLabels() {
   hud.labelsBegin();
-  if (started) {
+  if (started && tower.active) {
+    for (const e of enemies.list) {
+      if (!e.alive || e.def.boss || e.state === 'spawn') continue;
+      const k = Math.max(0, e.hp / e.maxHp), pct = Math.round(k * 20) * 5;
+      hud.label('ehp-' + e.id, `<b style="width:${pct}%"></b>`, e.x, (e.hopY || 0) + 1.2 * e.def.size + 0.2, e.z, 'ehp' + (k > 0.6 ? ' hi' : k > 0.3 ? ' mid' : ''));
+    }
+  } else if (started) {
     const m = missions.current();
     // 建設マス
     for (const s of builds.active()) {
@@ -1145,7 +1329,7 @@ function drawLabels() {
     for (const e of enemies.list) {
       if (!e.alive || e.def.boss || e.state === 'spawn' || !(e.hpShow > 0 || e.chasing)) continue;
       if (Math.hypot(e.x - P.x, e.z - P.z) > 14) continue;
-      const k = Math.max(0, e.hp / e.def.hp), pct = Math.round(k * 20) * 5;
+      const k = Math.max(0, e.hp / e.maxHp), pct = Math.round(k * 20) * 5;
       hud.label('ehp-' + e.id, `<b style="width:${pct}%"></b>`, e.x, (e.hopY || 0) + 1.2 * e.def.size + 0.2, e.z, 'ehp' + (k > 0.6 ? ' hi' : k > 0.3 ? ' mid' : ''));
     }
     // 狩り場への門

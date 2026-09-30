@@ -276,6 +276,21 @@ html, body {
 .sheet button.buy.drop { background: #fff0ec; border-color: #f2c3b9; color: #b04a3a; }
 .row-main small.need { color: #3c9a2a; font-weight: 800; }
 .sheet-bag { max-height: 86vh; overflow-y: auto; }
+.sheet h3.sec { margin: 4px 0 -4px; font-size: 14px; color: #8a5f3a; }
+.rar { color: #fff; border-radius: 6px; padding: 0 5px; margin-right: 4px; font-size: 11px; }
+hr.sep { border: 0; border-top: 2px dashed var(--line); margin: 4px 0; width: 100%; }
+.sheet button.close.alt { background: #fff; color: #8a5f3a; border-color: var(--line); }
+.sheet-adv, .sheet-tclear { max-height: 86vh; overflow-y: auto; }
+.chest-res {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 12px; border-radius: 16px;
+  background: radial-gradient(circle, #fff8d8, #fff); border: 3px solid var(--rc, #f1cf73); animation: chestpop .7s cubic-bezier(.3, 1.6, .5, 1);
+}
+.chest-res .big-ico .ico { width: 64px; height: 64px; animation: chestspin .7s ease-out; }
+.chest-res b { font-size: 17px; }
+.chest-res.r3 { box-shadow: 0 0 24px #ffcf3a; }
+.chest-res.r2 { box-shadow: 0 0 16px #b58ae0; }
+@keyframes chestpop { 0% { transform: scale(.3) rotate(-8deg); opacity: 0; } 60% { transform: scale(1.08) rotate(2deg); } }
+@keyframes chestspin { 0% { transform: rotateY(360deg) scale(.4); } 100% { transform: none; } }
 .sell-btns { display: flex; gap: 4px; flex: none; }
 .sheet button.buy.sell { min-width: 0; padding: 5px 7px; font-size: 13px; display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
 .sheet button.buy.sell small { font-size: 11px; }

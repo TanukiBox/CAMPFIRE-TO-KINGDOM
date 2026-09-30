@@ -8,7 +8,7 @@ const _sp = { x: 0, y: 0, on: false, behind: false };
 const bump = el => { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); };
 
 // 解放されるまで隠しておく表示
-const GATED = { hpPill: 'hp', bagPill: 'bag', coinPill: 'coins', rankRow: 'rank', btnGear: 'gear', btnUpgrade: 'upgrade', btnHire: 'hire', btnBook: 'book', btnStore: 'store' };
+const GATED = { hpPill: 'hp', bagPill: 'bag', coinPill: 'coins', rankRow: 'rank', btnGear: 'gear', btnUpgrade: 'upgrade', btnHire: 'hire', btnBook: 'book', btnStore: 'store', btnAdv: 'adv' };
 
 export const hud = {
   last: {},
@@ -24,6 +24,7 @@ export const hud = {
     $('hireIco').src = icon('people');
     $('bookIco').src = icon('book');
     $('storeIco').src = icon('box');
+    $('advIco').src = icon('chest');
     this.shown = {};
   },
 
@@ -163,6 +164,7 @@ export const hud = {
     $('hireLbl').textContent = t('btnHire');
     $('bookLbl').textContent = t('btnBook');
     $('storeLbl').textContent = t('btnStore');
+    $('advLbl').textContent = t('btnAdv');
     this.last = {};
   },
 };

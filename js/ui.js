@@ -1,11 +1,16 @@
 // メニュー画面：タイトル・強化・鍛冶屋・住民・章クリア・留守の売上・設定
 import { t, fmtTime } from './i18n.js';
 import { iconImg } from './icons.js';
-import { S, stat, weaponOf, armorOf } from './state.js';
-import { UPGRADES, TOOLS, JOBS, FACILITY, JOB_UP, STORAGE, WEAPONS, ARMORS, ENEMY_TYPES, MATERIALS, DISHES, CHAPTERS, LEVEL } from './data.js';
+import { S, stat, weaponOf, armorOf, weaponInst, baseOf, wPower, fxOf } from './state.js';
+import { UPGRADES, TOOLS, JOBS, FACILITY, JOB_UP, STORAGE, WEAPONS, ARMORS, ENEMY_TYPES, MATERIALS, DISHES, CHAPTERS, LEVEL, RARITY, ALCHEMY, CHEST } from './data.js';
 
 const $ = id => document.getElementById(id);
 const coinTag = n => `<span class="cost-coin">${iconImg('coin')}${n}</span>`;
+// 武器1本の表示（名前・レア度・攻撃・効果）
+const game_alcCost = (g, w) => g.alchemyCost(w);
+const wAtk = w => Math.round(baseOf(w).atk * (1 + w.p * ALCHEMY.plusAtk) * (1 + fxOf(w, 'atk') / 100) * 10) / 10;
+const wName = w => `<span style="color:${RARITY[w.r].color}">${t('w_' + w.b)}${w.p ? ` +${w.p}` : ''}</span>`;
+const wInfo = w => `${w.r ? `<span class="rar" style="background:${RARITY[w.r].color}">${t('rar_' + RARITY[w.r].id)}</span>` : ''}${t('atk')} ${wAtk(w)}${w.fx.length ? '　' + w.fx.map(([k, v]) => t('fx_' + k, { v })).join('・') : ''}`;
 
 export const ui = {
   open: null,
@@ -14,7 +19,7 @@ export const ui = {
   init(game) {
     this.game = game;
     $('sheetModal').addEventListener('pointerdown', e => {
-      if (e.target.id === 'sheetModal' && ['upgrade', 'smithy', 'hire', 'book', 'store', 'bag'].includes(this.open)) this.close();
+      if (e.target.id === 'sheetModal' && ['upgrade', 'smithy', 'hire', 'book', 'store', 'bag', 'adv'].includes(this.open)) this.close();
     });
     $('sheet').addEventListener('click', e => {
       const b = e.target.closest('button[data-act]');
@@ -28,6 +33,13 @@ export const ui = {
       else if (act === 'fac') { game.buyFacility(arg); this.render(); }
       else if (act === 'jobup') { game.buyJob(arg); this.render(); }
       else if (act === 'craft') { const [k, id] = arg.split('.'); game.craft(k, id); this.render(); }
+      else if (act === 'dis') { game.dismantle(arg); this.render(); }
+      else if (act === 'alc') { const [u, f] = arg.split('.'); game.alchemy(u, f); this.render(); }
+      else if (act === 'buyc') { game.buyChest(arg); this.render(); }
+      else if (act === 'openc') { const res = game.openChest(arg); this.data = { ...(this.data || {}), result: res }; this.render(); }
+      else if (act === 'tower') game.towerEnter(+arg);
+      else if (act === 'tnext') game.towerNext();
+      else if (act === 'tleave') game.towerLeave();
       else if (act === 'drop') { const [k, n] = arg.split('.'); game.discard(k, n === 'all' ? Infinity : +n); this.render(); }
       else if (act === 'sell') { const [k, n] = arg.split('.'); game.sellStorage(k, n === 'all' ? Infinity : +n); this.render(); }
       else if (act === 'equip') { const [k, id] = arg.split('.'); game.equip(k, id); this.render(); }
@@ -52,7 +64,7 @@ export const ui = {
 
   render() {
     const f = this['r_' + this.open];
-    const x = ['upgrade', 'smithy', 'hire', 'book', 'store', 'bag'].includes(this.open) ? `<button class="x-close" data-act="close" aria-label="${t('close')}">×</button>` : '';
+    const x = ['upgrade', 'smithy', 'hire', 'book', 'store', 'bag', 'adv'].includes(this.open) ? `<button class="x-close" data-act="close" aria-label="${t('close')}">×</button>` : '';
     if (f) $('sheet').innerHTML = x + f.call(this, this.data);
   },
 
@@ -103,10 +115,39 @@ export const ui = {
   // 鍛冶屋：武器・防具を作る、道具を強くする
   r_smithy(d = {}) {
     const g = this.game, tab = d.tab || 'w';
-    const tabs = `<div class="tabs">${['w', 'a', 'tool'].map(k => `<button class="${tab === k ? 'on' : ''}" data-act="tab:${k}">${t('smTab_' + k)}</button>`).join('')}</div>`;
+    const tabs = `<div class="tabs">${['w', 'a', 'alc', 'tool'].map(k => `<button class="${tab === k ? 'on' : ''}" data-act="tab:${k}">${t('smTab_' + k)}</button>`).join('')}</div>`;
     const me = `<p class="book-sum">${t('lvShort', { n: S.level })}　⚔ ${stat.dmg()}　🛡 ${stat.def()}　❤ ${stat.maxHp()}</p>`;
-    if (tab === 'w' || tab === 'a') {
-      const list = tab === 'w' ? WEAPONS : ARMORS, cur = tab === 'w' ? weaponOf() : armorOf();
+    if (tab === 'w') {
+      const cur = weaponInst();
+      const owned = [...S.weapons].sort((a, b) => wPower(b) - wPower(a)).map(w => {
+        const on = w.u === cur.u;
+        const btns = on ? `<button class="buy eq" disabled>${t('equipped')}</button>` : `<button class="buy eq" data-act="equip:w.${w.u}">${t('equip')}</button><button class="buy sell drop" data-act="dis:${w.u}">${t('dismantle')}</button>`;
+        return `<div class="row${on ? ' on' : ''}"><div class="row-ico">${iconImg('w_' + w.b)}</div><div class="row-main"><b>${wName(w)}</b><small class="stat">${wInfo(w)}</small></div><div class="btns">${btns}</div></div>`;
+      }).join('');
+      const make = WEAPONS.filter(it => it.cost).map(it => {
+        const cv = this.costView(it.cost);
+        return `<div class="row"><div class="row-ico">${iconImg('w_' + it.id)}</div><div class="row-main"><b>${t('w_' + it.id)}</b><small class="stat">${t('atk')} ${it.atk}</small><div class="costs">${cv.mats}</div></div><button class="buy" data-act="craft:w.${it.id}" ${cv.ok ? '' : 'disabled'}>${coinTag(it.cost.coin)}</button></div>`;
+      }).join('');
+      return `<h2>${t('smithTitle')}</h2>${tabs}${me}<h3 class="sec">${t('owned')}</h3>${owned}<h3 class="sec">${t('makeNew')}</h3><p class="sub">${t('smithDesc_w')}</p>${make}`;
+    }
+    if (tab === 'alc') {
+      // 同じ武器が2本以上あるものだけ錬金できる
+      const groups = {};
+      for (const w of S.weapons) (groups[w.b] = groups[w.b] || []).push(w);
+      const cur = weaponInst();
+      const blocks = Object.values(groups).filter(g => g.length >= 2).map(g => {
+        const target = g.includes(cur) ? cur : [...g].sort((a, b) => b.p - a.p || wPower(b) - wPower(a))[0];
+        const head = `<div class="row on"><div class="row-ico">${iconImg('w_' + target.b)}</div><div class="row-main"><small>${t('alcTarget')}</small><b>${wName(target)}</b><small class="stat">${wInfo(target)}</small></div></div>`;
+        if (target.p >= ALCHEMY.maxPlus) return head + `<p class="sub">${t('maxPlus')}</p>`;
+        const c = game_alcCost(this.game, target);
+        const ok = S.coins >= c.coin && this.game.bagCount('star') >= c.star;
+        const rows = g.filter(f => f !== target && f.u !== cur.u).map(f => `<div class="row"><div class="row-ico">${iconImg('w_' + f.b)}</div><div class="row-main"><b>${wName(f)}</b><small class="stat">${wInfo(f)}</small><div class="costs"><span class="cost-mat${this.game.bagCount('star') >= c.star ? '' : ' short'}">${iconImg('star')}${this.game.bagCount('star')}/${c.star}</span></div></div><button class="buy" data-act="alc:${target.u}.${f.u}" ${ok ? '' : 'disabled'}>${t('alcDo')} ${coinTag(c.coin)}</button></div>`).join('');
+        return head + rows;
+      }).join('<hr class="sep">');
+      return `<h2>${t('smithTitle')}</h2>${tabs}${me}<p class="sub">${t('smithDesc_alc')}</p>${blocks || `<p class="sub">${t('alcNone')}</p>`}`;
+    }
+    if (tab === 'a') {
+      const list = ARMORS, cur = armorOf();
       const rows = list.map(it => {
         const key = tab === 'w' ? it.id : 'a_' + it.id, have = !it.cost || S.gear[key], on = it === cur;
         const eff = tab === 'w' ? `${t('atk')} ${it.atk}` : `${t('def')} ${it.def}　❤+${it.hp}`;
@@ -184,6 +225,39 @@ export const ui = {
     }
     const found = keys.filter(k => (tab === 'mon' ? S.book.mon : tab === 'mat' ? S.book.mat : S.book.dish)[k]).length;
     return `<h2>${iconImg('book')} ${t('bookTitle')}</h2>${tabs}<p class="book-sum">${t('bkFound', { n: found, m: keys.length })}</p><div class="book-grid">${cards}</div>`;
+  },
+
+  r_adv(d = {}) {
+    const g = this.game, tab = d.tab || 'chest';
+    const tabs = `<div class="tabs">${['chest', 'tower'].map(k => `<button class="${tab === k ? 'on' : ''}" data-act="tab:${k}">${t('advTab_' + k)}</button>`).join('')}</div>`;
+    if (tab === 'tower') {
+      const best = S.tower.best || 0, from = g.towerStart();
+      const body = g.towerOpen()
+        ? `<p class="book-sum">${t('towerBest', { n: best })}</p><p class="sub">${t('towerDesc')}</p><button class="close" data-act="tower:1">${t('towerFrom', { n: 1 })}</button>${from > 1 ? `<button class="close alt" data-act="tower:${from}">${t('towerFrom', { n: from })}</button>` : ''}`
+        : `<p class="sub">${t('towerLocked')}</p>`;
+      return `<h2>${iconImg('tower')} ${t('advTitle')}</h2>${tabs}${body}`;
+    }
+    const r = d.result;
+    let res = '';
+    if (r) {
+      if (r.type === 'coins') res = `<div class="chest-res"><div class="big-ico">${iconImg('coin')}</div><b>${t('resCoins', { n: r.n })}</b></div>`;
+      else if (r.type === 'mat') res = `<div class="chest-res"><div class="big-ico">${iconImg(r.k)}</div><b>${t('resMat', { x: t('m_' + r.k), n: r.n })}</b></div>`;
+      else {
+        const w = S.weapons.find(x => x.u === r.u);
+        if (w) res = `<div class="chest-res r${w.r}" style="--rc:${RARITY[w.r].color}"><small>${t('resWeapon')}</small><div class="big-ico">${iconImg('w_' + w.b)}</div><b>${wName(w)}</b><small class="stat">${wInfo(w)}</small>${w.u !== S.wu ? `<button class="buy eq" data-act="equip:w.${w.u}">${t('equip')}${r.better ? ' ⬆' : ''}</button>` : `<small>${t('equipped')}</small>`}</div>`;
+      }
+    }
+    const stars = g.bagCount('star'), price = g.chestPrice();
+    const row = (k, ico) => `<div class="row"><div class="row-ico">${iconImg(ico)}</div><div class="row-main"><b>${t(k === 'star' ? 'chestStar' : 'chestN')} <span class="cnt">×${S.chest[k]}</span></b><small>${k === 'star' ? t('starHave', { n: stars }) : t('chestDesc')}</small></div><div class="btns"><button class="buy" data-act="openc:${k}" ${S.chest[k] > 0 ? '' : 'disabled'}>${t('open')}</button>${k === 'star' ? `<button class="buy up" data-act="buyc:star" ${stars >= CHEST.starPrice ? '' : 'disabled'}>${iconImg('star')}${CHEST.starPrice}</button>` : `<button class="buy up" data-act="buyc:normal" ${S.coins >= price ? '' : 'disabled'}>${coinTag(price)}</button>`}</div></div>`;
+    return `<h2>${iconImg('chest')} ${t('advTitle')}</h2>${tabs}${res}${row('normal', 'chest')}${row('star', 'starchest')}`;
+  },
+
+  // 塔の階をクリアしたとき
+  r_tclear(d) {
+    return `<div class="clear-burst">🗼</div><h2 class="big">${t('towerClear', { n: d.n })}</h2>
+      <div class="stats"><div><small>${t('coin')}</small><b>${iconImg('coin')}${d.coins}</b></div><div><small>EXP</small><b>${d.xp}</b></div><div><small>${t('m_star')}</small><b>${iconImg('star')}${d.stars}</b></div></div>
+      ${d.chest ? `<p class="book-sum">${iconImg('starchest')} ${t('chestStar')} +${d.chest}</p>` : ''}
+      <button class="close" data-act="tnext">${t('towerNext', { n: d.n + 1 })}</button><button class="close alt" data-act="tleave">${t('towerLeave')}</button>`;
   },
 
   // 背中の荷物：選んで捨てる

@@ -96,7 +96,7 @@ export class Player {
     this.pos.x += (this.vel.x + this.kx) * dt;
     this.pos.z += (this.vel.z + this.kz) * dt;
     const k = Math.pow(0.002, dt); this.kx *= k; this.kz *= k;
-    world.resolve(this.pos, 0.36);
+    world.resolve(this.pos, 0.36, world.playerArea());
     this.moveAmt += ((move.m > 0 ? 1 : 0) - this.moveAmt) * Math.min(1, dt * 10);
     this.lag.lerp(this.vel, Math.min(1, dt * 5));
 

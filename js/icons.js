@@ -139,6 +139,25 @@ const DRAW = {
     g.fillStyle = '#b07344'; poly(g, [[24, 26], [42, 18], [42, 36], [24, 44]]); g.fill();
     g.strokeStyle = '#7a4a2a'; g.lineWidth = 2; g.beginPath(); g.moveTo(6, 27); g.lineTo(24, 35); g.lineTo(42, 27); g.stroke();
   },
+  chest(g) {
+    g.fillStyle = '#8a5a33'; round(g, 6, 20, 36, 22, 4); g.fill();
+    g.fillStyle = '#b07344'; g.beginPath(); g.moveTo(6, 22); g.quadraticCurveTo(24, 4, 42, 22); g.closePath(); g.fill();
+    g.fillStyle = '#ffcf3a'; g.fillRect(6, 20, 36, 4); g.fillRect(21, 10, 6, 32);
+    g.fillStyle = '#e8a91e'; round(g, 19, 24, 10, 9, 2); g.fill();
+  },
+  starchest(g) {
+    g.fillStyle = '#4a3a7a'; round(g, 6, 20, 36, 22, 4); g.fill();
+    g.fillStyle = '#6a55b0'; g.beginPath(); g.moveTo(6, 22); g.quadraticCurveTo(24, 4, 42, 22); g.closePath(); g.fill();
+    g.fillStyle = '#ffe066'; g.fillRect(6, 20, 36, 4); g.fillRect(21, 10, 6, 32);
+    g.fillStyle = '#fff6b0'; star(g, 24, 30, 6, 3);
+  },
+  star(g) { g.fillStyle = '#ffd84a'; star(g, 24, 25, 19, 8); g.fillStyle = '#fff4b8'; star(g, 20, 21, 6, 2.5); },
+  tower(g) {
+    g.fillStyle = '#7a7290'; g.fillRect(14, 12, 20, 32);
+    g.fillStyle = '#8e86a0'; for (const x of [12, 20, 28]) g.fillRect(x, 6, 7, 8);
+    g.fillStyle = '#3a3350'; round(g, 20, 30, 8, 14, 3); g.fill();
+    g.fillStyle = '#ffcf3a'; g.fillRect(22, 18, 4, 5);
+  },
   heart(g) {
     g.fillStyle = '#ef4f5f';
     g.beginPath(); g.moveTo(24, 40);
@@ -152,6 +171,7 @@ function round(g, x, y, w, h, r) {
   g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
   g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
 }
+function star(g, cx, cy, R, r) { g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, d = i % 2 ? r : R; g.lineTo(cx + Math.cos(a) * d, cy + Math.sin(a) * d); } g.closePath(); g.fill(); }
 function poly(g, pts) { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); }
 
 // ---- 装備・モンスター・図鑑の絵 ----
