@@ -352,7 +352,7 @@ export function itemGeo(kind) {
   if (kind === 'jelly') return new THREE.IcosahedronGeometry(0.15, 1).scale(1.12, 0.82, 1.12);
   if (kind === 'plank') return new THREE.BoxGeometry(0.56, 0.11, 0.24);
   if (kind === 'block') return new THREE.BoxGeometry(0.3, 0.26, 0.3);
-  return itemGeo2(kind) || itemGeo3(kind) || itemGeo4(kind) || new THREE.BoxGeometry(0.25, 0.25, 0.25);
+  return itemGeo2(kind) || itemGeo3(kind) || itemGeo4(kind) || itemGeo5(kind) || new THREE.BoxGeometry(0.25, 0.25, 0.25);
 }
 export const coinGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.05, 10);
 
@@ -943,4 +943,74 @@ export function facilityDecor(level, w, d, color = 0xc0453a) {
     for (const s of [-1, 1]) add(g, new THREE.ConeGeometry(0.1, 0.3, 5), 0, s * 0.45, 2.55, fz + 0.12, 1, 1, 1, 0, 0, 0, mat(C.gold));
   }
   return g;
+}
+
+// ---- 新しいモンスター（部品の並び：0,1 は羽／足。飛ぶものは羽ばたく） ----
+export function beeParts() {
+  const B = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  const wing = s => B(0.5, 0.03, 0.34, s * 0.3, 0.72, -0.02);
+  return [
+    { geo: wing(-1), color: 0xeaf6ff, pivot: [-0.08, 0.72, 0], axis: 'z' },
+    { geo: wing(1), color: 0xeaf6ff, pivot: [0.08, 0.72, 0], axis: 'z' },
+    { geo: new THREE.SphereGeometry(0.3, 8, 6).scale(1, 0.9, 1.25).translate(0, 0.5, -0.05), tint: true },
+    { geo: mergeGeos([B(0.62, 0.12, 0.1, 0, 0.52, 0.02), B(0.58, 0.12, 0.1, 0, 0.5, -0.2), new THREE.SphereGeometry(0.2, 7, 5).translate(0, 0.58, 0.36), new THREE.ConeGeometry(0.06, 0.2, 5).rotateX(-Math.PI / 2).translate(0, 0.46, -0.46)]), color: 0x2b2233 },
+    { geo: mergeGeos([B(0.07, 0.07, 0.02, -0.08, 0.62, 0.55), B(0.07, 0.07, 0.02, 0.08, 0.62, 0.55)]), color: 0xffffff },
+  ];
+}
+export function boarParts() {
+  const B = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  const leg = (x, z) => ({ geo: B(0.14, 0.3, 0.16, x, 0.15, z), tint: true, pivot: [x, 0.3, z] });
+  return [
+    leg(-0.18, 0.32), leg(0.18, 0.32), leg(-0.18, -0.32), leg(0.18, -0.32),
+    { geo: mergeGeos([B(0.56, 0.5, 1.0, 0, 0.55, 0), B(0.42, 0.42, 0.34, 0, 0.6, 0.62)]), tint: true },
+    { geo: mergeGeos([B(0.26, 0.2, 0.14, 0, 0.52, 0.84), B(0.3, 0.14, 0.7, 0, 0.84, -0.05)]), color: 0x4a2e1e },
+    { geo: mergeGeos([new THREE.ConeGeometry(0.035, 0.2, 4).rotateX(-0.8).translate(-0.14, 0.48, 0.86), new THREE.ConeGeometry(0.035, 0.2, 4).rotateX(-0.8).translate(0.14, 0.48, 0.86)]), color: 0xf0e6cc },
+    { geo: mergeGeos([B(0.06, 0.06, 0.02, -0.12, 0.7, 0.8), B(0.06, 0.06, 0.02, 0.12, 0.7, 0.8), B(0.14, 0.08, 0.02, 0, 0.52, 0.915)]), color: 0x1e1a1a },
+  ];
+}
+export function crabParts() {
+  const B = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  const leg = (x, z) => ({ geo: B(0.36, 0.08, 0.08, x * 1.9, 0.18, z), tint: true, pivot: [x, 0.25, z] });
+  return [
+    leg(-0.3, 0.12), leg(0.3, 0.12), leg(-0.3, -0.18), leg(0.3, -0.18),
+    { geo: new THREE.SphereGeometry(0.5, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.45, 0.8).translate(0, 0.22, 0), tint: true },
+    { geo: mergeGeos([B(0.22, 0.2, 0.28, -0.48, 0.3, 0.5), B(0.22, 0.2, 0.28, 0.48, 0.3, 0.5), B(0.12, 0.12, 0.3, -0.36, 0.26, 0.28), B(0.12, 0.12, 0.3, 0.36, 0.26, 0.28)]), tint: true },
+    { geo: mergeGeos([B(0.04, 0.2, 0.04, -0.1, 0.44, 0.3), B(0.04, 0.2, 0.04, 0.1, 0.44, 0.3), new THREE.SphereGeometry(0.06, 5, 4).translate(-0.1, 0.56, 0.3), new THREE.SphereGeometry(0.06, 5, 4).translate(0.1, 0.56, 0.3)]), color: 0x1e1a1a },
+  ];
+}
+export function wispParts() {
+  const flame = s => new THREE.ConeGeometry(0.14, 0.5, 5).rotateZ(s * 1.1).translate(s * 0.34, 0.9, 0);
+  return [
+    { geo: flame(-1), color: 0xffb03a, pivot: [-0.1, 0.8, 0], axis: 'z' },
+    { geo: flame(1), color: 0xffb03a, pivot: [0.1, 0.8, 0], axis: 'z' },
+    { geo: new THREE.IcosahedronGeometry(0.4, 1).translate(0, 0.7, 0), tint: true },
+    { geo: mergeGeos([new THREE.ConeGeometry(0.28, 0.6, 6).translate(0, 1.1, -0.05), new THREE.IcosahedronGeometry(0.22, 0).translate(0, 0.72, 0.16)]), color: 0xffe066 },
+    { geo: mergeGeos([new THREE.BoxGeometry(0.08, 0.1, 0.03).translate(-0.12, 0.78, 0.38), new THREE.BoxGeometry(0.08, 0.1, 0.03).translate(0.12, 0.78, 0.38)]), color: 0x5a1a0a },
+  ];
+}
+
+// ---- 新しい素材と料理の形 ----
+const plate = () => faceColors(new THREE.CylinderGeometry(0.2, 0.17, 0.04, 10).translate(0, -0.06, 0), () => 0xf4f1ea);
+function itemGeo5(kind) {
+  const col = (g, c) => faceColors(g, typeof c === 'function' ? c : () => c);
+  switch (kind) {
+    case 'mushcap': return mergeGeos([col(new THREE.SphereGeometry(0.17, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.8, 1), f => (f % 5 === 0 ? 0xffffff : 0xe8514a)), col(new THREE.CylinderGeometry(0.06, 0.07, 0.1, 6).translate(0, -0.05, 0), 0xf6e7cc)]);
+    case 'honey': return mergeGeos([col(new THREE.CylinderGeometry(0.12, 0.13, 0.2, 8), 0xf0a830), col(new THREE.CylinderGeometry(0.13, 0.13, 0.05, 8).translate(0, 0.12, 0), 0xc98a4b)]);
+    case 'meat': return mergeGeos([col(new THREE.SphereGeometry(0.14, 7, 5).scale(1.3, 0.8, 1).translate(-0.05, 0, 0), 0xb0503a), col(new THREE.CylinderGeometry(0.03, 0.03, 0.22, 5).rotateZ(Math.PI / 2).translate(0.16, 0, 0), 0xf6efe0)]);
+    case 'cloth': return col(new THREE.BoxGeometry(0.4, 0.08, 0.3), f => (f % 4 < 2 ? 0x8a9a5a : 0x6f7a48));
+    case 'bone': return mergeGeos([col(new THREE.CylinderGeometry(0.045, 0.045, 0.34, 6).rotateZ(Math.PI / 2), 0xf2efe6), ...[-1, 1].flatMap(s => [col(new THREE.SphereGeometry(0.06, 5, 4).translate(s * 0.18, 0.04, 0), 0xf2efe6), col(new THREE.SphereGeometry(0.06, 5, 4).translate(s * 0.18, -0.04, 0), 0xf2efe6)])]);
+    case 'crabmeat': return col(new THREE.BoxGeometry(0.3, 0.16, 0.2), f => (f < 4 ? 0xff8a6a : 0xfff2ea));
+    case 'tail': return col(new THREE.ConeGeometry(0.1, 0.4, 6).rotateZ(Math.PI / 2), f => (f % 3 ? 0xe8603a : 0xffc04a));
+    case 'firestone': return col(new THREE.OctahedronGeometry(0.15, 0).scale(1, 1.2, 1), f => (f % 2 ? 0xffb03a : 0xff5a2a));
+    case 'dessert': return mergeGeos([plate(), col(new THREE.SphereGeometry(0.12, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), 0x86e36f)]);
+    case 'sautee': return mergeGeos([plate(), col(new THREE.BoxGeometry(0.1, 0.06, 0.1).translate(-0.05, 0, 0), 0xb07a44), col(new THREE.BoxGeometry(0.1, 0.06, 0.1).translate(0.06, 0, 0.03), 0xe8514a), col(new THREE.BoxGeometry(0.06, 0.06, 0.06).translate(0, 0.02, -0.07), 0x5fbf4f)]);
+    case 'steak': return mergeGeos([plate(), col(new THREE.BoxGeometry(0.22, 0.07, 0.15), 0x8a3a22), col(new THREE.BoxGeometry(0.05, 0.05, 0.05).translate(0.1, 0.02, 0.08), 0x5fbf4f)]);
+    case 'soup': return mergeGeos([col(new THREE.CylinderGeometry(0.16, 0.1, 0.14, 10), 0xf4f1ea), col(new THREE.CylinderGeometry(0.14, 0.14, 0.02, 10).translate(0, 0.06, 0), 0xd9a05a)]);
+    case 'honeyjelly': return mergeGeos([plate(), col(new THREE.CylinderGeometry(0.1, 0.12, 0.12, 8).translate(0, 0.02, 0), 0xf0a830), col(new THREE.SphereGeometry(0.04, 5, 4).translate(0, 0.1, 0), 0xe24b4b)]);
+    case 'stew': return mergeGeos([col(new THREE.CylinderGeometry(0.16, 0.1, 0.14, 10), 0x8a5a35), col(new THREE.CylinderGeometry(0.14, 0.14, 0.02, 10).translate(0, 0.06, 0), 0x9a4a2a)]);
+    case 'crabpot': return mergeGeos([col(new THREE.CylinderGeometry(0.17, 0.15, 0.16, 10), 0x3c3f46), col(new THREE.CylinderGeometry(0.15, 0.15, 0.02, 10).translate(0, 0.07, 0), f => (f % 3 ? 0xff7a5a : 0xfff2ea))]);
+    case 'skewer': return mergeGeos([col(new THREE.CylinderGeometry(0.015, 0.015, 0.42, 4).rotateZ(Math.PI / 2), 0xc98a4b), ...[-0.1, 0, 0.1].map(x => col(new THREE.BoxGeometry(0.08, 0.08, 0.08).translate(x, 0, 0), 0xe8603a))]);
+    case 'feast': return mergeGeos([col(new THREE.CylinderGeometry(0.24, 0.2, 0.05, 12).translate(0, -0.06, 0), 0xf5c542), col(new THREE.SphereGeometry(0.1, 6, 4).translate(-0.07, 0.02, 0), 0x8a3a22), col(new THREE.BoxGeometry(0.1, 0.08, 0.08).translate(0.09, 0, 0.05), 0xff8a6a), col(new THREE.SphereGeometry(0.06, 5, 4).translate(0.05, 0.03, -0.08), 0xf0a830)]);
+  }
+  return null;
 }

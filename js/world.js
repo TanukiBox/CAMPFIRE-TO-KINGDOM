@@ -24,6 +24,7 @@ const VIVID = [new THREE.Color(0x86d95e), new THREE.Color(0x6fcb4f)];
 const SAND = new THREE.Color(0xf0dca8), WET = new THREE.Color(0xc9b27c);
 const BRIGHT = [new THREE.Color(0x7fde5a), new THREE.Color(0x62cf48)];
 const ROYALG = [new THREE.Color(0x9be060), new THREE.Color(0x7fd24f)];
+const HUNT = new THREE.Color(0x6f9a4e);
 const WILD = new THREE.Color(0x8fae6a), OUTER = new THREE.Color(0x76b85a), DIRT = new THREE.Color(0xe2c38f);
 
 export class World {
@@ -94,7 +95,7 @@ export class World {
       const x = pos.getX(i), z = pos.getZ(i), h = pos.getY(i);
       c.copy(a).lerp(bb, noise2(x, z) * 0.5 + 0.5);
       const id = this.landOf(x, z);
-      if (id && !this.owned.has(id)) c.lerp(WILD, 0.55);
+      if (id && !this.owned.has(id)) c.lerp(this.isHunt(id) ? HUNT : WILD, this.isHunt(id) ? 0.4 : 0.55);
       if (h > 0) c.lerp(OUTER, Math.min(1, h / 2));
       const dc = Math.hypot(x - fx, z - fz);
       if (dc < 4.2) c.lerp(DIRT, clamp((4.2 - dc) / 1.4, 0, 1));
@@ -111,16 +112,19 @@ export class World {
     this.paintGround();
   }
 
-  // 土地を買ったら柵を立て直す
+  // 土地を買ったら柵を立て直す。歩けるのは「買った土地（領地）」と「狩り場」
   setOwned(list) {
     this.owned = new Set(list);
-    this.ownedRects = this.lands.filter(l => this.owned.has(l.id)).map(l => l.rect);
-    this.ownedInset = this.insetRects(this.ownedRects);
+    this.walkRects = this.lands.filter(l => this.owned.has(l.id) || l.hunt).map(l => l.rect);
+    this.ownedInset = this.insetRects(this.walkRects);
     this.makeFence();
     this.paintGround();
   }
+  kind(l) { return !l ? 'none' : this.owned.has(l.id) ? 'own' : l.hunt ? 'hunt' : 'wild'; }
+  isWalk(id) { const l = this.land(id); return !!l && (this.owned.has(id) || !!l.hunt); }
+  isHunt(id) { const l = this.land(id); return !!(l && l.hunt); }
 
-  // 他の買った土地とつながっていない辺だけ内側に寄せる
+  // 他の歩ける土地とつながっていない辺だけ内側に寄せる
   insetRects(rects) {
     return rects.map(r => {
       const open = (x, z) => rects.some(o => o !== r && inRect(o, x, z));
@@ -132,29 +136,42 @@ export class World {
     });
   }
 
+  // 柵：領地どうしの間にはなし。領地と狩り場（狩り場どうし）の間は、まん中に門がある柵
   makeFence() {
-    if (this.fenceMeshes) for (const m of this.fenceMeshes) { scene.remove(m); m.dispose(); }
-    const posts = [], rails = [], gate = this.ch.gate;
+    if (this.fenceMeshes) for (const m of this.fenceMeshes) { scene.remove(m); if (m.dispose) m.dispose(); }
+    const posts = [], rails = [], gate = this.ch.gate, arches = [];
+    this.fenceBoxes = []; this.gates = [];
+    const GATE = 1.7;
     const neighbor = (l, x, z) => this.lands.find(o => o !== l && inRect(o.rect, x, z));
     const side = (l, ax, az, bx, bz, ox, oz) => {
       const nb = neighbor(l, (ax + bx) / 2 + ox, (az + bz) / 2 + oz);
-      const mine = this.owned.has(l.id);
-      if (nb) {
-        const theirs = this.owned.has(nb.id);
-        if (mine && theirs) return;
-        if (!mine && theirs) return;                     // 買った側から描く
-        if (!mine && !theirs && this.lands.indexOf(nb) < this.lands.indexOf(l)) return;
-      }
+      const kl = this.kind(l), kn = this.kind(nb);
+      if (kl === 'own' && kn === 'own') return;
+      if (nb && this.lands.indexOf(nb) < this.lands.indexOf(l)) return;   // 同じ辺は1回だけ描く
+      const walkL = kl !== 'wild', walkN = kn === 'own' || kn === 'hunt';
+      const hasGate = walkL && walkN;
       const len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(len / 1.7));
+      const ux = (bx - ax) / len, uz = (bz - az) / len, cx = (ax + bx) / 2, cz = (az + bz) / 2;
       for (let i = 0; i < n; i++) {
         const t0 = i / n, t1 = (i + 1) / n;
         const x0 = ax + (bx - ax) * t0, z0 = az + (bz - az) * t0, x1 = ax + (bx - ax) * t1, z1 = az + (bz - az) * t1;
         const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
-        posts.push([x0, z0]);
-        if (gate && l.id === 'home' && Math.abs(mz - gate.z) < 0.1 && Math.abs(mx - gate.x) < gate.w / 2) continue; // 門
+        const inGate = hasGate && Math.hypot(mx - cx, mz - cz) < GATE;
+        if (!inGate) posts.push([x0, z0]);
+        if (inGate) continue;
+        if (gate && l.id === 'home' && Math.abs(mz - gate.z) < 0.1 && Math.abs(mx - gate.x) < gate.w / 2) continue; // 客の門
         rails.push([mx, mz, Math.hypot(x1 - x0, z1 - z0), Math.atan2(-(z1 - z0), x1 - x0)]);
       }
       posts.push([bx, bz]);
+      if (hasGate) {
+        // 門の両側の柵は通れない
+        const g0 = { x: cx - ux * GATE, z: cz - uz * GATE }, g1 = { x: cx + ux * GATE, z: cz + uz * GATE };
+        const wall = (px, pz, qx, qz) => this.fenceBoxes.push({ x0: Math.min(px, qx) - 0.12, x1: Math.max(px, qx) + 0.12, z0: Math.min(pz, qz) - 0.12, z1: Math.max(pz, qz) + 0.12 });
+        wall(ax, az, g0.x, g0.z); wall(g1.x, g1.z, bx, bz);
+        arches.push([g0, g1, Math.atan2(-(bz - az), bx - ax)]);
+        const hunt = kl === 'hunt' ? l : kn === 'hunt' ? nb : null;
+        this.gates.push({ x: cx, z: cz, hunt: hunt ? hunt.id : null, own: kl === 'own' ? l.id : kn === 'own' ? nb.id : null });
+      }
     };
     for (const l of this.lands) {
       const r = l.rect;
@@ -176,6 +193,17 @@ export class World {
     railMesh.count = rails.length * 2;
     for (const im of [postMesh, railMesh]) { im.castShadow = true; im.computeBoundingSphere(); scene.add(im); }
     this.fenceMeshes = [postMesh, railMesh];
+    // 門のアーチ（狩り場へ出る門は赤い旗）
+    for (const [g0, g1, a] of arches) {
+      const g = new THREE.Group();
+      const post = (x, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(0.28, 2.1, 0.28), mat(0x8a5f3a)); b.position.set(x, 1.05, z); g.add(b); };
+      post(g0.x, g0.z); post(g1.x, g1.z);
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(GATE * 2 + 0.5, 0.22, 0.3), mat(0x8a5f3a));
+      beam.position.set((g0.x + g1.x) / 2, 2.1, (g0.z + g1.z) / 2); beam.rotation.y = a; g.add(beam);
+      const flag = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.45, 0.05), mat(0xc0453a));
+      flag.position.set((g0.x + g1.x) / 2, 1.72, (g0.z + g1.z) / 2); flag.rotation.y = a; g.add(flag);
+      scene.add(g); this.fenceMeshes.push(g);
+    }
   }
 
   makeGlow() {
@@ -288,7 +316,7 @@ export class World {
   // (fx,fz)→(tx,tz) のまっすぐな道が建物をふさいでいたら、建物の角を回る中継点を返す（ふさいでいなければ null）
   detour(fx, fz, tx, tz, m = 0.7) {
     let hit = null, best = Infinity;
-    for (const b of this.boxes) {
+    for (const b of [...this.boxes, ...this.fenceBoxes]) {
       if (b.off && b.off()) continue;
       // 行き先や今いる所が建物のすぐそば（中）なら、その建物はよけない（戸口や店番の場所）
       const inside = (x, z) => x > b.x0 - m && x < b.x1 + m && z > b.z0 - m && z < b.z1 + m;
@@ -329,7 +357,7 @@ export class World {
       const dx = p.x - c.x, dz = p.z - c.z, rr = r + c.r, d2 = dx * dx + dz * dz;
       if (d2 < rr * rr && d2 > 1e-8) { const d = Math.sqrt(d2); p.x = c.x + dx / d * rr; p.z = c.z + dz / d * rr; }
     }
-    for (const b of this.boxes) {
+    for (const b of this.boxes.concat(this.fenceBoxes)) {
       if (b.off && b.off()) continue;
       const cx = clamp(p.x, b.x0, b.x1), cz = clamp(p.z, b.z0, b.z1);
       const dx = p.x - cx, dz = p.z - cz, d2 = dx * dx + dz * dz;

@@ -4,7 +4,7 @@ import * as THREE from './lib/three.module.min.js';
 import { Rig } from './rig.js';
 import * as THREE2 from './lib/three.module.min.js';
 import { scene, mat } from './gfx.js';
-import { slimeParts, mushroomParts, bossParts, wolfParts, goblinParts, chiefParts, trollParts, skeletonParts, golemParts, lizardParts, drakeParts, dragonParts } from './models.js';
+import { slimeParts, mushroomParts, bossParts, wolfParts, goblinParts, chiefParts, trollParts, skeletonParts, golemParts, lizardParts, drakeParts, dragonParts, beeParts, boarParts, crabParts, wispParts } from './models.js';
 import { ENEMY_TYPES } from './data.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _w = new THREE.Color(0xffffff);
@@ -22,6 +22,7 @@ export class Enemies {
       wolf: new Rig(wolfParts(), 60), goblin: new Rig(goblinParts(), 60), chief: new Rig(chiefParts(), 2),
       troll: new Rig(trollParts(), 30), skeleton: new Rig(skeletonParts(), 60), golem: new Rig(golemParts(), 2),
       lizard: new Rig(lizardParts(), 40), drake: new Rig(drakeParts(), 40), dragon: new Rig(dragonParts(), 2),
+      bee: new Rig(beeParts(), 40), boar: new Rig(boarParts(), 40), crab: new Rig(crabParts(), 40), wisp: new Rig(wispParts(), 40),
     };
     // 巨人が投げる岩
     this.rocks = [];
@@ -56,7 +57,7 @@ export class Enemies {
   nearest(x, z, range) {
     let best = null, bd = range;
     for (const e of this.list) {
-      if (!e.alive || e.state === 'spawn' || !this.world.isOwned(e.land)) continue;
+      if (!e.alive || e.state === 'spawn' || !this.world.isWalk(e.land)) continue;
       const d = Math.hypot(e.x - x, e.z - z) - e.r;
       if (d < bd) { bd = d; best = e; }
     }
@@ -184,7 +185,7 @@ export class Enemies {
   // ぬし：追いかける → ため → 跳び上がって押しつぶす → 休む（ときどき子分を呼ぶ）
   updateBoss(e, dt, player, playerLand, hooks) {
     const P = player.pos, def = e.def;
-    const inside = player.alive && playerLand === e.land && this.world.isOwned(e.land);
+    const inside = player.alive && playerLand === e.land && this.world.isWalk(e.land);
     const dp = Math.hypot(P.x - e.x, P.z - e.z);
     if (!e.fight) {
       if (inside && dp < def.aggro) { e.fight = true; e.phase = 'chase'; e.pt = 0; e.introT = 2.2; hooks.onBossStart(e); }
@@ -306,7 +307,7 @@ export class Enemies {
       if (!HOPPERS.includes(def.rig)) {
         const w = Math.sin(e.walk) * 0.6;
         ang.fill(0);
-        if (def.rig === 'wolf' || def.rig === 'lizard') { ang[0] = w; ang[1] = -w; ang[2] = -w; ang[3] = w; }
+        if (['wolf', 'lizard', 'boar', 'crab'].includes(def.rig)) { ang[0] = w; ang[1] = -w; ang[2] = -w; ang[3] = w; }
         else if (def.fly) { const f = Math.sin(performance.now() / 1000 * (def.boss ? 5 : 9) + e.x) * 0.7; ang[0] = f; ang[1] = -f; }
         else {
           ang[0] = w; ang[1] = -w;

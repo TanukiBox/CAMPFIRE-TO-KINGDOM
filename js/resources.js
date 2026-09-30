@@ -121,7 +121,7 @@ export class Resources {
   nearest(x, z) {
     let best = null, bd = Infinity;
     for (const n of this.nodes) {
-      if (n.state !== 'ok' || !this.world.isOwned(n.land)) continue;
+      if (n.state !== 'ok' || !this.world.isWalk(n.land)) continue;
       const d = Math.hypot(n.x - x, n.z - z);
       if (d < n.def.reach + 0.35 && d < bd) { bd = d; best = n; }
     }

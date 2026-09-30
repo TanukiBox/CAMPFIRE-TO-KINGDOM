@@ -3,7 +3,7 @@
 import * as THREE from './lib/three.module.min.js';
 import { scene, bake } from './gfx.js';
 import { tileModel, shipModel, facilityDecor } from './models.js';
-import { MATERIALS, SHOP, STORAGE, INN, HARBOR, FACILITY } from './data.js';
+import { MATERIALS, SHOP, STORAGE, INN, HARBOR, FACILITY, KITCHEN, RECIPES, INGREDIENTS, DISHES } from './data.js';
 import { S } from './state.js';
 import { pileSpot } from './items.js';
 import { burst, floatText } from './fx.js';
@@ -47,7 +47,7 @@ export class Stations {
         const sh = {
           id: d.id, site, stock, coinPos: at(s.coins), queue: at(s.queue),
           counter: { x: d.x + s.counter[0], y: s.counter[1], z: d.z + s.counter[2] },
-          sells: s.all ? PRICED : CH1_SELL, mult: s.mult || 1, cap: s.cap || SHOP.stockCap, every: s.every || SHOP.every, keeperOk: s.keeper !== false,
+          sells: s.all ? PRICED : s.kitchen ? DISHES : CH1_SELL, mult: s.mult || 1, kitchen: !!s.kitchen, cap: s.cap || SHOP.stockCap, every: s.every || SHOP.every, keeperOk: s.keeper !== false,
           customers: [], spawnT: 2, serveT: 0, depT: 0, collectT: 0, keeperT: 0, inflight: 0, waiting: null, ship: s.ship ? { phase: 'away', t: HARBOR.first, sold: 0, money: 0, buyT: 0, x: 0 } : null,
           tile: place(tileModel({ size: 1.7, mark: 'none', plate: 0xfff1c2, border: 0xd99a1e }), stock.x, stock.z),
         };
@@ -60,6 +60,11 @@ export class Stations {
         }
         this.shops.push(sh);
         if (!this.shop) this.shop = sh;
+        if (s.kitchen) {
+          // 食堂の厨房：お店の黄色いマスにモンスターの素材を入れると料理になり、カウンターに並ぶ
+          this.kitchen = { id: 'kitchen', kitchen: true, site, def: KITCHEN, from: INGREDIENTS, to: 'dessert', inPos: stock, tile: sh.tile, shop: sh, inflight: 0, depT: 0, cooking: 0 };
+          this.proc.push(this.kitchen);
+        }
       }
       if (d.inn) {
         const fur = at(d.inn.fur);
@@ -184,6 +189,7 @@ export class Stations {
   // drawOnly = メニューを開いている間（描くだけ）
   update(dt, time, player, hooks, drawOnly = false) {
     for (const p of this.proc) {
+      if (p.kitchen) { this.updateKitchen(p, dt, time, hooks, drawOnly); continue; }
       const done = p.site.done;
       if (p.tile) p.tile.group.visible = done;
       p.outTile.group.visible = done;
@@ -252,6 +258,43 @@ export class Stations {
     if (!drawOnly) { this.updateBurn(dt, time, player, hooks); this.updateStorage(dt, time, player, hooks); }
     for (const sh of this.shops) this.updateShop(sh, dt, time, player, hooks, drawOnly);
     this.updateInn(dt, time, player, hooks, drawOnly);
+  }
+
+  // 厨房が今ほしい材料（倉庫にあって、厨房に空きがあるもの）
+  kitchenWants() {
+    const k = this.kitchen;
+    if (!k || !k.site.done || !this.storageReady()) return null;
+    return INGREDIENTS.find(m => (S.storage[m] || 0) > 0 && this.inCount(k, m) < this.inCap(k)) || null;
+  }
+  // 材料がそろっている中で いちばん高い料理
+  recipeFor(k) { return RECIPES.find(r => Object.keys(r.need).every(m => this.inCount(k, m) >= r.need[m])) || null; }
+
+  // 厨房：材料から料理を作り、できた料理はカウンターへ飛んでいく
+  updateKitchen(p, dt, time, hooks, drawOnly) {
+    const sh = p.shop;
+    if (!p.site.done) return;
+    const st = this.st(p);
+    this.refreshDecor(p);
+    const room = this.stockTotal(sh) + sh.inflight < this.outCap(p);
+    const r = this.recipeFor(p);
+    p.cooking = r && room ? r.id : null;
+    if (!drawOnly && r && room) {
+      st.t += dt * this.speed(p);
+      if (st.t >= p.def.time) {
+        st.t = 0;
+        for (const m in r.need) st.ink[m] -= r.need[m];
+        const d = sh.site.def;
+        burst(d.x - 0.8, 1.6, d.z - 0.4, { n: 4, colors: [0xffffff, 0xf0ece4], speed: 0.4, up: 1.2, size: 0.18, life: 1.0, g: -0.5, floor: false, grow: 1 });
+        sh.inflight++;
+        this.counterSpot(sh, this.stockTotal(sh) + sh.inflight - 1, r.id, _v);
+        const it = this.items.make(r.id, p.inPos.x, 0.6, p.inPos.z);
+        this.items.flyTo(it, _v.x, _v.y, _v.z, 0.45, () => { sh.inflight--; S.shop.stock[r.id] = (S.shop.stock[r.id] || 0) + 1; sfx.pop(); });
+        hooks.onCook(r.id);
+      }
+    }
+    // 厨房のマスの上に材料の山
+    let i = 0;
+    for (const m of INGREDIENTS) for (let j = 0; j < Math.min(this.inCount(p, m), 4) && i < 16; j++, i++) { pileSpot(i, m, p.inPos.x, p.inPos.z, _v); this.items.draw(m, _v.x, _v.y, _v.z, 0); }
   }
 
   // 焚き火にくべる：少し立っていると、今使わない素材から燃やす
@@ -339,10 +382,10 @@ export class Stations {
     if (!sh.site.done) return;
     const state = this.shopState(sh);
     if (!drawOnly) {
-      // 主人公が商品を並べる
+      // 主人公が商品を並べる（食堂は厨房へ材料を入れる）
       if (player.alive && near(player.pos, sh.stock.x, sh.stock.z, 0.95)) {
         sh.depT -= dt;
-        while (sh.depT <= 0) { sh.depT += 0.07; if (!this.stockOne(sh, player, player, hooks)) { sh.depT = 0; break; } }
+        while (sh.depT <= 0) { sh.depT += 0.07; if (!(sh.kitchen ? this.feedOne(this.kitchen, player, player, hooks) : this.stockOne(sh, player, player, hooks))) { sh.depT = 0; break; } }
       } else sh.depT = 0;
       if (sh.ship) this.updateShip(sh, dt, time, hooks);
       // 客が来る

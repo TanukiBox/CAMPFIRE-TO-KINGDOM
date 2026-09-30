@@ -115,6 +115,23 @@ const DRAW = {
     g.fillStyle = '#ff8a5a'; poly(g, [[24, 6], [40, 16], [24, 22], [8, 16]]); g.fill();
     g.strokeStyle = '#8a2a22'; g.lineWidth = 2; g.beginPath(); g.moveTo(24, 22); g.lineTo(24, 42); g.stroke();
   },
+  mushcap(g) { g.fillStyle = '#f6e7cc'; g.fillRect(19, 26, 10, 14); g.fillStyle = '#e8514a'; g.beginPath(); g.ellipse(24, 26, 17, 12, 0, Math.PI, 0); g.fill(); g.fillStyle = '#fff'; for (const [x, y] of [[16, 20], [28, 17], [33, 23]]) { g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill(); } },
+  honey(g) { g.fillStyle = '#f0a830'; round(g, 11, 16, 26, 26, 7); g.fill(); g.fillStyle = '#c98a4b'; g.fillRect(10, 10, 28, 7); g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(15, 22, 4, 12); },
+  meat(g) { g.fillStyle = '#f6efe0'; g.fillRect(28, 26, 14, 5); g.beginPath(); g.arc(42, 25, 3.5, 0, 7); g.arc(42, 32, 3.5, 0, 7); g.fill(); g.fillStyle = '#b0503a'; g.beginPath(); g.ellipse(20, 26, 13, 10, -0.3, 0, 7); g.fill(); g.fillStyle = '#d07a5a'; g.beginPath(); g.ellipse(17, 23, 5, 3, -0.3, 0, 7); g.fill(); },
+  cloth(g) { g.fillStyle = '#8a9a5a'; poly(g, [[6, 16], [40, 12], [42, 34], [8, 38]]); g.fill(); g.fillStyle = '#6f7a48'; poly(g, [[14, 18], [26, 17], [24, 30], [12, 30]]); g.fill(); },
+  bone(g) { g.fillStyle = '#f2efe6'; g.save(); g.translate(24, 24); g.rotate(-0.6); g.fillRect(-14, -3, 28, 6); for (const x of [-15, 15]) { g.beginPath(); g.arc(x, -4, 5, 0, 7); g.arc(x, 4, 5, 0, 7); g.fill(); } g.restore(); },
+  crabmeat(g) { g.fillStyle = '#fff2ea'; round(g, 8, 16, 32, 18, 5); g.fill(); g.fillStyle = '#ff8a6a'; round(g, 8, 16, 32, 8, 4); g.fill(); },
+  tail(g) { g.fillStyle = '#e8603a'; g.beginPath(); g.moveTo(6, 30); g.quadraticCurveTo(24, 8, 44, 16); g.quadraticCurveTo(26, 22, 10, 38); g.closePath(); g.fill(); g.fillStyle = '#ffc04a'; for (const [x, y] of [[16, 26], [26, 19], [36, 16]]) { g.beginPath(); g.arc(x, y, 2.5, 0, 7); g.fill(); } },
+  firestone(g) { g.fillStyle = '#ff5a2a'; poly(g, [[24, 4], [38, 22], [24, 44], [10, 22]]); g.fill(); g.fillStyle = '#ffb03a'; poly(g, [[24, 4], [38, 22], [24, 26], [10, 22]]); g.fill(); g.fillStyle = '#fff2b0'; poly(g, [[22, 12], [26, 12], [24, 20]]); g.fill(); },
+  dessert(g) { plateI(g); g.fillStyle = '#86e36f'; g.beginPath(); g.ellipse(24, 28, 11, 11, 0, Math.PI, 0); g.fill(); g.fillStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.ellipse(20, 22, 3, 2, -0.5, 0, 7); g.fill(); },
+  sautee(g) { plateI(g); g.fillStyle = '#b07a44'; g.fillRect(14, 22, 8, 7); g.fillStyle = '#e8514a'; g.fillRect(24, 20, 8, 8); g.fillStyle = '#5fbf4f'; g.fillRect(20, 27, 6, 5); },
+  steak(g) { plateI(g); g.fillStyle = '#8a3a22'; round(g, 12, 19, 22, 12, 5); g.fill(); g.fillStyle = '#5fbf4f'; g.beginPath(); g.arc(35, 27, 3.5, 0, 7); g.fill(); },
+  soup(g) { g.fillStyle = '#f4f1ea'; g.beginPath(); g.moveTo(6, 22); g.lineTo(42, 22); g.quadraticCurveTo(40, 42, 24, 42); g.quadraticCurveTo(8, 42, 6, 22); g.fill(); g.fillStyle = '#d9a05a'; g.beginPath(); g.ellipse(24, 22, 17, 5, 0, 0, 7); g.fill(); },
+  honeyjelly(g) { plateI(g); g.fillStyle = '#f0a830'; round(g, 15, 14, 18, 17, 5); g.fill(); g.fillStyle = '#e24b4b'; g.beginPath(); g.arc(24, 12, 3.5, 0, 7); g.fill(); },
+  stew(g) { g.fillStyle = '#8a5a35'; g.beginPath(); g.moveTo(6, 22); g.lineTo(42, 22); g.quadraticCurveTo(40, 42, 24, 42); g.quadraticCurveTo(8, 42, 6, 22); g.fill(); g.fillStyle = '#9a4a2a'; g.beginPath(); g.ellipse(24, 22, 17, 5, 0, 0, 7); g.fill(); g.fillStyle = '#f2efe6'; g.fillRect(28, 12, 4, 10); },
+  crabpot(g) { g.fillStyle = '#3c3f46'; round(g, 8, 18, 32, 22, 6); g.fill(); g.fillStyle = '#ff7a5a'; g.beginPath(); g.ellipse(24, 19, 15, 5, 0, 0, 7); g.fill(); g.fillStyle = '#fff2ea'; g.fillRect(18, 16, 5, 3); },
+  skewer(g) { g.strokeStyle = '#c98a4b'; g.lineWidth = 3; g.beginPath(); g.moveTo(6, 40); g.lineTo(42, 8); g.stroke(); g.fillStyle = '#e8603a'; for (const [x, y] of [[16, 31], [24, 24], [32, 17]]) g.fillRect(x - 5, y - 5, 10, 10); },
+  feast(g) { g.fillStyle = '#f5c542'; g.beginPath(); g.ellipse(24, 32, 20, 8, 0, 0, 7); g.fill(); g.fillStyle = '#8a3a22'; g.beginPath(); g.arc(18, 24, 8, 0, 7); g.fill(); g.fillStyle = '#ff8a6a'; g.fillRect(26, 20, 11, 8); g.fillStyle = '#f0a830'; g.beginPath(); g.arc(31, 16, 5, 0, 7); g.fill(); },
   heart(g) {
     g.fillStyle = '#ef4f5f';
     g.beginPath(); g.moveTo(24, 40);
@@ -123,6 +140,7 @@ const DRAW = {
   },
 };
 
+function plateI(g) { g.fillStyle = '#e9e4da'; g.beginPath(); g.ellipse(24, 32, 19, 7, 0, 0, 7); g.fill(); g.fillStyle = '#fbf8f2'; g.beginPath(); g.ellipse(24, 31, 16, 5.5, 0, 0, 7); g.fill(); }
 function round(g, x, y, w, h, r) {
   g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
   g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();

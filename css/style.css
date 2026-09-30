@@ -328,3 +328,5 @@ html, body {
 .boss-intro { position: absolute; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none; animation: corIn .8s cubic-bezier(.3, 1.4, .5, 1) both; }
 .boss-intro small { display: block; color: #ffd0c0; font-weight: 800; letter-spacing: .2em; text-shadow: 0 2px 0 #5a1a1a; }
 .boss-intro b { display: block; font-size: clamp(30px, 9vw, 52px); color: #fff; font-weight: 800; -webkit-text-stroke: 2px #8a2a1a; paint-order: stroke fill; text-shadow: 0 4px 0 #8a2a1a, 0 6px 16px rgba(0,0,0,.4); }
+
+.fac-label.hunt { background: #7a2e22; color: #fff; border-color: #c0453a; font-size: 12px; padding: 1px 8px; }

@@ -126,6 +126,31 @@ export class Workers {
   carrier(w, dt, player, hooks) {
     const open = this.stations.shops.filter(sh => sh.site.done);
     if (!open.length) return this.idle(w, dt);
+    // 倉庫にある料理の材料を、食堂の厨房へ運ぶ（これを先にやる）
+    const kit = this.stations.kitchen, sto = this.stations.storage;
+    if (w.state === 'kdeliver' || w.state === 'kfetch' || (!w.bag.length && this.stations.kitchenWants())) {
+      if (w.state !== 'kdeliver') {
+        w.state = 'kfetch';
+        if (this.goTo(w, sto.pos.x, sto.pos.z, dt, 0.8)) {
+          w.actT -= dt;
+          if (w.actT <= 0) {
+            w.actT = 0.08 / this.workMul(w);
+            const m = this.stations.kitchenWants();
+            if (m && w.bag.length < w.cap) { S.storage[m]--; this.items.give(w, m, sto.door.x, 1, sto.door.z); }
+            else w.state = w.bag.length ? 'kdeliver' : 'idle';
+          }
+        }
+        return;
+      }
+      if (this.goTo(w, kit.inPos.x, kit.inPos.z, dt, 0.7)) {
+        w.actT -= dt;
+        if (w.actT <= 0) {
+          w.actT = 0.1 / this.workMul(w);
+          if (!this.stations.feedOne(kit, w, player, hooks) && w.bag.every(it => it.state === 'bag')) w.state = w.bag.length ? 'kdeliver' : 'idle';
+        }
+      }
+      return;
+    }
     const sold = k => open.some(sh => sh.sells.includes(k));
     if (w.state === 'stock' || (w.bag.length > 0 && w.state !== 'load')) {
       w.state = 'stock';
@@ -171,7 +196,7 @@ export class Workers {
       w.think = 2;
       let best = null, bs = Infinity;
       for (const e of this.enemies.list) {
-        if (!e.alive || e.state === 'spawn' || e.def.boss || e.passive || !this.world.isOwned(e.land)) continue;
+        if (!e.alive || e.state === 'spawn' || e.def.boss || e.passive || !this.world.isWalk(e.land)) continue;
         const dPlayer = Math.hypot(e.x - player.pos.x, e.z - player.pos.z), dMe = Math.hypot(e.x - w.x, e.z - w.z);
         if (dMe > 35) continue;
         const score = dPlayer < 12 ? dPlayer : 100 + dMe;

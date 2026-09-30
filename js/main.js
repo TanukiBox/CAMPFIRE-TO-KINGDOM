@@ -1,7 +1,7 @@
 // 焚き火から王国へ — 全体のつなぎ込みと毎フレームの処理
 import * as THREE from './lib/three.module.min.js';
 import { renderer, scene, camera, resize, placeCamera, perfTick, perfReset, perf, quality, Blobs, params, setDay } from './gfx.js';
-import { CHAPTERS, MATERIALS, UPGRADES, TOOLS, JOBS, SHOP, PLAYER, FACILITY, JOB_UP, chapterData, LAST_CHAPTER } from './data.js';
+import { CHAPTERS, MATERIALS, UPGRADES, TOOLS, JOBS, SHOP, PLAYER, FACILITY, JOB_UP, STORAGE, INGREDIENTS, chapterData, LAST_CHAPTER } from './data.js';
 import { initMusic, play as playMusic, setMusic } from './music.js';
 import { S, stat, loadState, resetState, rankScore, rankOf } from './state.js';
 import { World } from './world.js';
@@ -62,6 +62,8 @@ const enemies = new Enemies(ch, world);
 const builds = new Builds(ch, world);
 if (hasSave) builds.load(save.builds);
 const stations = new Stations(ch, builds, items, coins, world);
+// 食堂になる前のセーブ：お店に並んでいた板・石材・ゼリーは倉庫へ
+for (const k of ['plank', 'block', 'jelly']) if (S.shop.stock[k]) { S.storage[k] = (S.storage[k] || 0) + S.shop.stock[k]; delete S.shop.stock[k]; }
 const workers = new Workers(world, builds, resources, stations, items, enemies);
 const missions = new Missions(ch.missions);
 world.addTown(ch.towns);
@@ -179,13 +181,20 @@ player.hooks = {
   },
 };
 
-function onKill(e) {
+function onKill(e, byWorker = false) {
   const def = e.def;
   sfx.kill(); shake(def.boss ? 0.6 : 0.2);
   const y = 0.4 * def.size;
   burst(e.x, y, e.z, { n: def.boss ? 60 : 18, color: e.color.getHex(), speed: def.boss ? 7 : 4, up: 5, size: def.boss ? 0.3 : 0.16, life: 0.9 });
   ring(e.x, e.z, 0xffffff, def.boss ? 6 : 1.6, 0.4);
-  if (!e.minion) for (const k in def.drop) popDrops(k, def.drop[k], e.x, e.z, 0.5 + y);
+  if (!e.minion) {
+    // 兵士が倒した分は、倉庫があれば倉庫へ直接しまう
+    const total = Object.values(S.storage).reduce((a, b) => a + b, 0);
+    if (byWorker && stations.storageReady() && total < STORAGE.cap) {
+      for (const k in def.drop) S.storage[k] = (S.storage[k] || 0) + def.drop[k];
+      floatText('📦', e.x, 1.4, e.z, 'coin');
+    } else for (const k in def.drop) popDrops(k, def.drop[k], e.x, e.z, 0.5 + y);
+  }
   if (!e.minion && def.coins) {
     const pieces = Math.min(8, def.coins);
     for (let i = 0; i < pieces; i++) {
@@ -262,13 +271,14 @@ const stationHooks = {
     dirty = true;
   },
   onSell() { dirty = true; },
+  onCook(dish) { missions.event('cook', dish); dirty = true; },
   onShipArrive() { hud.toast(`⛵ ${t('shipCome')}`); sfx.horn(); },
   onShip(n, money) { missions.event('ship'); hud.toast(`⛵ ${t('shipSold', { n, m: money })}`, 'good'); dirty = true; },
   onSoldierHit(e, killed, w) {
     const hy = 0.55 * e.def.size;
     burst(e.x, hy, e.z, { n: 5, colors: [0xffffff, 0xcfd8e8], speed: 4, up: 1.5, size: 0.08, life: 0.25, g: 0, floor: false });
     if (Math.hypot(w.x - player.pos.x, w.z - player.pos.z) < 12) sfx.clang();
-    if (killed) onKill(e);
+    if (killed) onKill(e, true);
   },
 };
 
@@ -496,12 +506,12 @@ function missionTarget() {
   }
   switch (m.type) {
     case 'gather': {
-      const hunt = { horn: ['skeleton', 'troll'], scale: ['lizard', 'drake'], fur: ['wolf'] }[m.kind];
-      if (hunt) { let best = null, bd = Infinity; for (const z of ch.spawns) if (hunt.includes(z.type) && world.isOwned(world.landOf(z.x, z.z))) { const d = Math.hypot(z.x - P.x, z.z - P.z); if (d < bd) { bd = d; best = z; } } return best && bd > 4 ? { x: best.x, z: best.z, y: 1.5 } : null; }
+      const hunt = { horn: ['troll'], scale: ['drake'], fur: ['wolf'], honey: ['bee'], mushcap: ['mushroom'], meat: ['boar'], bone: ['skeleton'], cloth: ['goblin'], crabmeat: ['crab'], tail: ['lizard'], firestone: ['wisp'], jelly: ['slime'] }[m.kind];
+      if (hunt) { let best = null, bd = Infinity; for (const z of ch.spawns) if (hunt.includes(z.type) && world.isWalk(world.landOf(z.x, z.z))) { const d = Math.hypot(z.x - P.x, z.z - P.z); if (d < bd) { bd = d; best = z; } } return best && bd > 4 ? { x: best.x, z: best.z, y: 1.5 } : null; }
       const type = { wood: 'tree', ore: 'ironrock', herb: 'herb', stone: 'rock', gold: 'goldrock' }[m.kind] || 'tree';
       if (items.count(player, m.kind) >= m.n - S.mp && player.bag.length) return null;
       let best = null, bd = Infinity;
-      for (const n of resources.nodes) if (n.type === type && n.state === 'ok' && world.isOwned(n.land)) { const d = Math.hypot(n.x - P.x, n.z - P.z); if (d < bd) { bd = d; best = n; } }
+      for (const n of resources.nodes) if (n.type === type && n.state === 'ok' && world.isWalk(n.land)) { const d = Math.hypot(n.x - P.x, n.z - P.z); if (d < bd) { bd = d; best = n; } }
       return best && bd > 2 ? { x: best.x, z: best.z, y: type === 'tree' ? 2.8 : 1.6 } : null;
     }
     case 'feed': {
@@ -511,6 +521,7 @@ function missionTarget() {
     case 'take': { const s = stations.proc.find(p => p.to === m.kind); return s ? { x: s.outPos.x, z: s.outPos.z } : null; }
     case 'make': { const s = stations.proc.find(p => p.to === m.kind); return s ? (s.gen ? { x: s.outPos.x, z: s.outPos.z } : { x: s.inPos.x, z: s.inPos.z }) : null; }
     case 'stock': { const sh = stations.shops.find(x => x.id === (m.kind || 'shop')); return sh ? { x: sh.stock.x, z: sh.stock.z } : null; }
+    case 'cook': { const k = stations.kitchen; return k && k.site.done ? { x: k.inPos.x, z: k.inPos.z } : null; }
     case 'ship': { const sh = stations.shops.find(x => x.ship); return sh ? { x: sh.stock.x, z: sh.stock.z } : null; }
     case 'guest': {
       const inn = stations.inn;
@@ -522,7 +533,7 @@ function missionTarget() {
     case 'tool': return { x: stations.anvil.pos.x, z: stations.anvil.pos.z };
     case 'kill': {
       let best = null, bd = Infinity;
-      for (const z of ch.spawns) if (z.type === m.kind && world.isOwned(world.landOf(z.x, z.z))) { const d = Math.hypot(z.x - P.x, z.z - P.z); if (d < bd) { bd = d; best = z; } }
+      for (const z of ch.spawns) if (z.type === m.kind && world.isWalk(world.landOf(z.x, z.z))) { const d = Math.hypot(z.x - P.x, z.z - P.z); if (d < bd) { bd = d; best = z; } }
       return best && bd > 4 ? { x: best.x, z: best.z, y: 1.5 } : null;
     }
     case 'boss': { const b = enemies.bossOf(m.kind); return b && b.alive ? { x: b.x, z: b.z, y: 2 + b.def.size * 0.8 } : null; }
@@ -553,7 +564,7 @@ function chapterClear() {
 }
 
 // ---- エンディング：城が完成 → 戴冠式 → スタッフロール → おしまい ----
-let ending = null, bossIntro = null;
+let ending = null, bossIntro = null, lastLand = null;
 function startEnding() {
   if (ending) return;
   S.cleared[S.ch] = true;
@@ -807,6 +818,14 @@ function tick(raw, show) {
   perfTick(raw);
   // 朝・昼・夕焼け・夜（8分でひとまわり）
   if (!paused) S.day = (S.day + dt / 480) % 1;
+  // 狩り場に入った・領地に戻った
+  const here = world.landOf(player.pos.x, player.pos.z);
+  if (started && here !== lastLand) {
+    const wasHunt = lastLand && world.isHunt(lastLand), isHunt = here && world.isHunt(here);
+    if (isHunt && !wasHunt) hud.toast(`⚔ ${t('enterHunt', { l: t('l_' + here) })}`, 'bad');
+    else if (!isHunt && wasHunt) hud.toast(`🏠 ${t('backHome')}`);
+    lastLand = here;
+  }
   const night = setDay(S.day);
   world.setNight(night);
   // ぬしの登場演出
@@ -915,14 +934,14 @@ function drawLabels() {
     // 加工場・お店の札（近くにいるときだけ）
     const P = player.pos, close = (x, z) => Math.hypot(x - P.x, z - P.z) < 9;
     for (const p of stations.proc) {
-      if (!p.site.done) continue;
+      if (!p.site.done || p.kitchen) continue;
       const st = stations.st(p);
       if (!p.gen && close(p.inPos.x, p.inPos.z)) hud.label('in-' + p.id, p.from.map(k => `${iconImg(k)}<b>${stations.inCount(p, k)}</b>`).join(' ') + `<small>/${stations.inCap(p)}</small>`, p.inPos.x, 1.1, p.inPos.z, 'st-label');
       if (close(p.outPos.x, p.outPos.z) && st.out > 0) hud.label('out-' + p.id, `${iconImg(p.to)}<b>${st.out}</b>`, p.outPos.x, 1.3, p.outPos.z, 'st-label out');
     }
     for (const sh of stations.shops) {
       if (!sh.site.done) continue;
-      if (close(sh.stock.x, sh.stock.z)) {
+      if (!sh.kitchen && close(sh.stock.x, sh.stock.z)) {
         const icons = sh.sells.length > 3 ? `${iconImg('coin')}×${sh.mult}` : sh.sells.map(k => iconImg(k)).join('');
         hud.label('stock-' + sh.id, `${icons}<b>${stations.stockTotal(sh)}</b><small>/${sh.cap}</small>`, sh.stock.x, 1.1, sh.stock.z, 'st-label shop');
       }
@@ -944,6 +963,14 @@ function drawLabels() {
       if (Math.hypot(e.x - P.x, e.z - P.z) > 14) continue;
       const k = Math.max(0, e.hp / e.def.hp), pct = Math.round(k * 20) * 5;
       hud.label('ehp-' + e.id, `<b style="width:${pct}%"></b>`, e.x, (e.hopY || 0) + 1.2 * e.def.size + 0.2, e.z, 'ehp' + (k > 0.6 ? ' hi' : k > 0.3 ? ' mid' : ''));
+    }
+    // 狩り場への門
+    for (const g of world.gates) if (g.hunt && close(g.x, g.z)) hud.label('gate-' + g.x + g.z, `⚔ ${t('l_' + g.hunt)}`, g.x, 2.6, g.z, 'fac-label hunt');
+    // 厨房（料理中の料理と、材料）
+    const kit = stations.kitchen;
+    if (kit && kit.site.done && close(kit.inPos.x, kit.inPos.z)) {
+      const have = INGREDIENTS.filter(m => stations.inCount(kit, m) > 0).map(m => `${iconImg(m)}<b>${stations.inCount(kit, m)}</b>`).join(' ');
+      hud.label('kitchen', `🍳 ${kit.cooking ? iconImg(kit.cooking) : ''} ${have || t('kitchenEmpty')}`, kit.inPos.x, 1.1, kit.inPos.z, 'st-label shop');
     }
     // 施設のレベル
     for (const p of stations.proc) if (p.site.done && stations.lv(p) > 0 && close(p.site.def.x, p.site.def.z)) hud.label('fac-' + p.id, t('lv', { n: stations.lv(p) + 1 }), p.site.def.x, 3.9, p.site.def.z, 'fac-label');
