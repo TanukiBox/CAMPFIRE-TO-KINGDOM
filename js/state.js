@@ -1,5 +1,7 @@
 // 進み具合（セーブされる値）と、そこから計算する値
-import { UPGRADES, TOOLS, RANK } from './data.js';
+import { UPGRADES, TOOLS, RANK, LEVEL, WEAPONS, ARMORS } from './data.js';
+export const weaponOf = () => WEAPONS.find(w => w.id === S.weapon) || WEAPONS[0];
+export const armorOf = () => ARMORS.find(a => a.id === S.armor) || ARMORS[0];
 
 export const S = {
   ch: 1,
@@ -21,6 +23,10 @@ export const S = {
   bosses: {},                // 倒したぬし
   fac: {},                   // 施設のレベル（0 = Lv1）
   jobLv: {},                 // 仕事ごとのレベル（0 = Lv1）
+  level: 1, xp: 0,           // 主人公のレベルと経験値
+  weapon: 'rusty', armor: 'cloth', gear: {},   // 身につけている装備と、作った装備
+  book: { mon: {}, mat: {}, dish: {} },          // 図鑑
+  requests: [],              // 住民の依頼
   day: 0.1,                  // 1日のうちの時刻（0〜1）
   cleared: {},
   bossDead: false,
@@ -31,8 +37,8 @@ export const S = {
 
 export function resetState() {
   const fresh = {
-    ch: 1, coins: 0, earned: 0, up: { bag: 0, speed: 0, hp: 0 }, tool: { sword: 0, axe: 0, pick: 0 }, hired: [], lands: ['home'],
-    mission: 0, mp: 0, unlocked: {}, stations: {}, shop: { stock: { plank: 0, block: 0, jelly: 0 }, coins: 0 }, storage: {}, market: { stock: {}, coins: 0 }, bigmarket: { stock: {}, coins: 0 }, port: { stock: {}, coins: 0 }, inn: { fur: 0, coins: 0 }, bosses: {}, fac: {}, jobLv: {}, day: 0.1, cleared: {}, bossDead: false,
+    ch: 1, coins: 0, earned: 0, up: { bag: 0, speed: 0, hp: 0 }, tool: { axe: 0, pick: 0 }, hired: [], lands: ['home'],
+    mission: 0, mp: 0, unlocked: {}, stations: {}, shop: { stock: { plank: 0, block: 0, jelly: 0 }, coins: 0 }, storage: {}, market: { stock: {}, coins: 0 }, bigmarket: { stock: {}, coins: 0 }, port: { stock: {}, coins: 0 }, inn: { fur: 0, coins: 0 }, bosses: {}, fac: {}, jobLv: {}, level: 1, xp: 0, weapon: 'rusty', armor: 'cloth', gear: {}, book: { mon: {}, mat: {}, dish: {} }, requests: [], day: 0.1, cleared: {}, bossDead: false,
     time: 0, lastSeen: 0, stats: { sold: 0, kills: 0 },
   };
   for (const k in S) delete S[k];
@@ -51,15 +57,25 @@ export function loadState(d) {
   S.bigmarket.stock = { ...(d.bigmarket && d.bigmarket.stock) };
   S.port.stock = { ...(d.port && d.port.stock) };
   if (S.bossDead) S.bosses.bigslime = true;   // 区切り2のセーブ
+  S.book = { mon: {}, mat: {}, dish: {}, ...(d.book || {}) };
+  // 以前の「剣の強化」「HPの強化」は、同じくらいの装備に置き換える
+  if (d.weapon === undefined) {
+    const sw = (d.tool && d.tool.sword) || 0, hp = (d.up && d.up.hp) || 0;
+    const wmap = ['rusty', 'stone', 'stone', 'iron', 'cleaver', 'bone', 'gold', 'gold', 'flame', 'dragon'];
+    const amap = ['cloth', 'jelly', 'jelly', 'fur', 'fur', 'bone', 'gold', 'gold', 'gold', 'dragon'];
+    S.weapon = wmap[Math.min(sw, wmap.length - 1)]; S.armor = amap[Math.min(hp, amap.length - 1)];
+    S.gear[S.weapon] = true; S.gear['a_' + S.armor] = true;
+  }
 }
 
 export const stat = {
   cap: () => UPGRADES.bag.values[S.up.bag],
   speed: () => UPGRADES.speed.values[S.up.speed],
-  maxHp: () => UPGRADES.hp.values[S.up.hp],
-  dmg: () => TOOLS.sword.values[S.tool.sword],
+  maxHp: () => 10 + (S.level - 1) * LEVEL.hpPer + armorOf().hp,
+  dmg: () => Math.round(weaponOf().atk * (1 + (S.level - 1) * LEVEL.atkPer) * 10) / 10,
+  def: () => armorOf().def,
   power: tool => TOOLS[tool] ? TOOLS[tool].values[S.tool[tool]] : 1,
-  swing: tool => TOOLS[tool] ? TOOLS[tool].swing[S.tool[tool]] : 0.35,
+  swing: tool => tool === 'sword' ? 0.42 - WEAPONS.indexOf(weaponOf()) * 0.022 : TOOLS[tool] ? TOOLS[tool].swing[S.tool[tool]] : 0.35,
 };
 
 export function rankScore(pop, buildings) {

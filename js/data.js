@@ -26,13 +26,36 @@ export const STORAGE = { cap: 200 };
 export const UPGRADES = {
   bag:   { values: [10, 15, 20, 26, 32, 40, 50, 60, 75, 90, 110, 130], costs: [30, 70, 140, 240, 380, 600, 900, 1400, 2000, 3000, 4500] },   // 背中の積載量
   speed: { values: [4.4, 4.8, 5.2, 5.6, 6.0, 6.4, 6.8, 7.2, 7.6, 8.0], costs: [40, 110, 220, 400, 650, 1000, 1500, 2200, 3200] },             // 移動速度
-  hp:    { values: [10, 14, 18, 24, 30, 38, 48, 60, 75, 95], costs: [40, 110, 230, 450, 750, 1100, 1600, 2400, 3500] },                     // HP
 };
+
+// 主人公のレベル：モンスターを倒す・建物を建てる・ミッションで経験値。レベルが上がるとHPと攻撃力が上がる
+export const LEVEL = { hpPer: 3, atkPer: 0.05, build: 15, missionMul: 0.5, need: lv => Math.floor(20 * Math.pow(lv, 1.6)) };
+
+// 鍛冶屋で作る装備（素材は背中と倉庫から）。作ると自動でいちばん強いものを身につける
+export const WEAPONS = [
+  { id: 'rusty',   atk: 1,  cost: null, color: 0xb9b0a0, len: 1.0 },
+  { id: 'stone',   atk: 3,  cost: { block: 4, jelly: 4, coin: 40 }, color: 0xa8adb5, len: 1.05 },
+  { id: 'iron',    atk: 6,  cost: { ore: 10, fur: 4, coin: 150 }, color: 0xdfe5ec, len: 1.1 },
+  { id: 'cleaver', atk: 9,  cost: { ore: 12, cloth: 8, coin: 300 }, color: 0x9aa4b0, len: 1.2 },
+  { id: 'bone',    atk: 14, cost: { bone: 12, ore: 10, coin: 600 }, color: 0xf2efe6, len: 1.25 },
+  { id: 'gold',    atk: 20, cost: { gold: 16, horn: 6, coin: 1200 }, color: 0xffd34d, len: 1.3 },
+  { id: 'flame',   atk: 28, cost: { firestone: 8, tail: 8, gold: 10, coin: 2500 }, color: 0xff7a2a, len: 1.35, glow: true },
+  { id: 'dragon',  atk: 40, cost: { scale: 20, firestone: 10, gold: 20, coin: 5000 }, color: 0xb04ad0, len: 1.45, glow: true },
+];
+export const ARMORS = [
+  { id: 'cloth',  def: 0, hp: 0,  cost: null, color: 0x4f86d9 },
+  { id: 'jelly',  def: 1, hp: 4,  cost: { jelly: 10, mushcap: 4, coin: 60 }, color: 0x86e36f },
+  { id: 'fur',    def: 2, hp: 10, cost: { fur: 10, cloth: 6, coin: 200 }, color: 0xc9a27a },
+  { id: 'bone',   def: 4, hp: 18, cost: { bone: 14, horn: 4, coin: 700 }, color: 0xf2efe6 },
+  { id: 'gold',   def: 6, hp: 28, cost: { gold: 20, bone: 8, coin: 1500 }, color: 0xffd34d },
+  { id: 'dragon', def: 9, hp: 45, cost: { scale: 24, firestone: 8, coin: 4000 }, color: 0xb04ad0 },
+];
+
+// 住民の依頼：ときどき住民が「○○がほしい」「○○を倒して」とたのむ。かなえるとコインと経験値
+export const REQUESTS = { every: [50, 90], max: 2, names: { ja: ['ミナ', 'ソラ', 'ハル', 'リク', 'ユイ', 'カイ', 'ノア', 'メイ', 'タロ', 'ヒナ'], en: ['Mina', 'Sora', 'Hal', 'Rik', 'Yui', 'Kai', 'Noa', 'May', 'Taro', 'Hina'] } };
 
 // 鍛冶屋での強化（素材＋コイン）。素材は背中から使う
 export const TOOLS = {
-  sword: { values: [1, 2, 3, 5, 7, 10, 14, 20, 28, 40], swing: [0.42, 0.4, 0.38, 0.36, 0.34, 0.32, 0.3, 0.28, 0.27, 0.26],
-    costs: [{ block: 3, coin: 40 }, { block: 6, jelly: 4, coin: 100 }, { block: 10, jelly: 8, coin: 220 }, { block: 10, ore: 8, coin: 400 }, { ore: 16, fur: 6, coin: 700 }, { gold: 10, horn: 6, coin: 1200 }, { gold: 20, horn: 12, coin: 2000 }, { scale: 8, gold: 20, coin: 3500 }, { scale: 16, gold: 30, coin: 5000 }] },
   axe:   { values: [1, 2, 3, 4, 5, 6], swing: [0.5, 0.42, 0.36, 0.32, 0.28, 0.26], costs: [{ plank: 5, coin: 40 }, { block: 6, coin: 120 }, { ore: 8, coin: 300 }, { gold: 8, coin: 900 }, { scale: 6, coin: 2500 }] },
   pick:  { values: [1, 2, 3, 4, 5, 6], swing: [0.55, 0.46, 0.4, 0.34, 0.3, 0.28], costs: [{ plank: 5, coin: 50 }, { block: 6, coin: 140 }, { ore: 8, coin: 300 }, { gold: 8, coin: 900 }, { scale: 6, coin: 2500 }] },
 };
@@ -313,7 +336,7 @@ export const CHAPTERS = {
       { id: 'stonework', type: 'build',   target: 'stonework', reward: 20 },
       { id: 'blocks',    type: 'make',    kind: 'block', n: 5, reward: 20 },
       { id: 'smithy',    type: 'build',   target: 'smithy', reward: 30 },
-      { id: 'tool',      type: 'tool',    n: 1, reward: 30 },
+      { id: 'tool',      type: 'craft',   n: 1, reward: 30 },
       { id: 'house2',    type: 'build',   target: 'house2', reward: 30, unlock: ['hire'] },
       { id: 'hire',      type: 'hire',    n: 1, reward: 30 },
       { id: 'mush',      type: 'kill',    kind: 'mushroom', n: 3, reward: 40 },
@@ -321,6 +344,8 @@ export const CHAPTERS = {
       { id: 'cook1b',    type: 'cook',    kind: 'honeyjelly', n: 3, reward: 50 },
       { id: 'house3',    type: 'build',   target: 'house3', reward: 50 },
       { id: 'hire3',     type: 'hire',    n: 3, reward: 50 },
+      { id: 'lv1',       type: 'level',   n: 5, reward: 50 },
+      { id: 'req1',      type: 'request', n: 1, reward: 50 },
       { id: 'buy_north', type: 'build',   target: 'north', reward: 80 },
       { id: 'rank',      type: 'rank',    n: 5, reward: 80 },
       { id: 'boss',      type: 'boss',    kind: 'bigslime', reward: 0 },
@@ -389,7 +414,8 @@ export const CHAPTERS = {
       { id: 'mstock',    type: 'stock',  kind: 'market', n: 10, reward: 60 },
       { id: 'herbalist', type: 'hireJob', kind: 'herbalist', n: 1, reward: 80 },
       { id: 'house6',    type: 'build',  target: 'house6', reward: 100 },
-      { id: 'tool2',     type: 'tool',   n: 1, reward: 100 },
+      { id: 'tool2',     type: 'craft',  n: 1, reward: 100 },
+      { id: 'lv2',       type: 'level',  n: 8, reward: 100 },
       { id: 'goblins',   type: 'kill',   kind: 'goblin', n: 5, reward: 100 },
       { id: 'rank2',     type: 'rank',   n: 8, reward: 150 },
       { id: 'boss2',     type: 'boss',   kind: 'goblinchief', reward: 0 },
@@ -457,7 +483,8 @@ export const CHAPTERS = {
       { id: 'cook3',      type: 'cook',    kind: 'crabpot', n: 3, reward: 250 },
       { id: 'house8',     type: 'build',   target: 'house8', reward: 200 },
       { id: 'wall',       type: 'build',   target: 'wall', reward: 300 },
-      { id: 'tool3',      type: 'tool',    n: 1, reward: 200 },
+      { id: 'tool3',      type: 'craft',   n: 1, reward: 200 },
+      { id: 'lv3',        type: 'level',   n: 12, reward: 200 },
       { id: 'rank3',      type: 'rank',    n: 12, reward: 300 },
       { id: 'boss3',      type: 'boss',    kind: 'golem', reward: 0 },
     ],
@@ -513,7 +540,8 @@ export const CHAPTERS = {
       { id: 'cook4',       type: 'cook',   kind: 'skewer', n: 3, reward: 400 },
       { id: 'castle3',     type: 'build',  target: 'castle3', reward: 600 },
       { id: 'statue',      type: 'build',  target: 'statue', reward: 500 },
-      { id: 'tool4',       type: 'tool',   n: 1, reward: 400 },
+      { id: 'tool4',       type: 'craft',  n: 1, reward: 400 },
+      { id: 'lv4',         type: 'level',  n: 16, reward: 400 },
       { id: 'rank4',       type: 'rank',   n: 15, reward: 600 },
       { id: 'boss4',       type: 'boss',   kind: 'dragon', reward: 0 },
       { id: 'castle4',     type: 'build',  target: 'castle4', reward: 0 },

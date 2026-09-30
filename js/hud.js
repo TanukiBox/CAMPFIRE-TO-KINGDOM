@@ -8,7 +8,7 @@ const _sp = { x: 0, y: 0, on: false, behind: false };
 const bump = el => { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); };
 
 // 解放されるまで隠しておく表示
-const GATED = { hpPill: 'hp', bagPill: 'bag', coinPill: 'coins', rankRow: 'rank', btnGear: 'gear', btnUpgrade: 'upgrade', btnHire: 'hire' };
+const GATED = { hpPill: 'hp', bagPill: 'bag', coinPill: 'coins', rankRow: 'rank', btnGear: 'gear', btnUpgrade: 'upgrade', btnHire: 'hire', btnBook: 'book' };
 
 export const hud = {
   last: {},
@@ -22,6 +22,7 @@ export const hud = {
     $('popIco').src = icon('people');
     $('upIco').src = icon('hammer');
     $('hireIco').src = icon('people');
+    $('bookIco').src = icon('book');
     this.shown = {};
   },
 
@@ -64,6 +65,16 @@ export const hud = {
     $('coinNum').textContent = n.toLocaleString();
     if (up) bump($('coinPill'));
   },
+
+  // 主人公のレベルと経験値のバー
+  level(lv, frac) {
+    const k = lv + ':' + Math.floor(frac * 50);
+    if (this.last.lv === k) return;
+    this.last.lv = k;
+    $('lvNum').textContent = t('lvShort', { n: lv });
+    $('xpFill').style.width = Math.min(100, frac * 100) + '%';
+  },
+  levelBump() { bump($('lvPill')); $('lvPill').classList.remove('shine'); void $('lvPill').offsetWidth; $('lvPill').classList.add('shine'); },
 
   rank(rank, name, pop) {
     const k = rank + name + pop;
@@ -149,6 +160,7 @@ export const hud = {
     $('moveHint').querySelector('span').textContent = t('moveHint');
     $('upLbl').textContent = t('btnUpgrade');
     $('hireLbl').textContent = t('btnHire');
+    $('bookLbl').textContent = t('btnBook');
     this.last = {};
   },
 };

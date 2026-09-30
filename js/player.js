@@ -3,7 +3,7 @@ import * as THREE from './lib/three.module.min.js';
 import { scene } from './gfx.js';
 import { playerModel, LEVEL_COLORS } from './models.js';
 import { PLAYER, NODE_TYPES } from './data.js';
-import { S, stat } from './state.js';
+import { S, stat, weaponOf, armorOf } from './state.js';
 
 const IDLE_ARM = 0.2;
 
@@ -36,15 +36,21 @@ export class Player {
     this.maxHp = stat.maxHp();
     if (oldMax && this.maxHp > oldMax) this.hp += this.maxHp - oldMax;
     const m = this.m;
-    m.toolMat.sword.color.setHex(LEVEL_COLORS.blade[S.tool.sword]);
+    // 武器：刃の色と長さ。炎の剣・竜の剣は光る
+    const w = weaponOf(), a = armorOf();
+    m.toolMat.sword.color.setHex(w.color);
+    m.toolMat.sword.emissive.setHex(w.glow ? w.color : 0x000000);
+    m.toolMat.sword.emissiveIntensity = w.glow ? 0.45 : 0;
+    m.tools.sword.scale.set(1 + (w.len - 1) * 0.6, 1 + (w.len - 1) * 0.6, w.len);
     m.toolMat.axe.color.setHex(LEVEL_COLORS.blade[S.tool.axe]);
     m.toolMat.pick.color.setHex(LEVEL_COLORS.blade[S.tool.pick]);
-    for (const k of ['sword', 'axe', 'pick']) m.tools[k].scale.setScalar(1 + S.tool[k] * 0.12);
-    m.shoe.color.setHex(LEVEL_COLORS.shoe[S.up.speed]);
-    m.armor.visible = S.up.hp > 0;
-    m.armorMat.color.setHex(LEVEL_COLORS.armor[S.up.hp]);
-    m.pack.scale.set(1 + S.up.bag * 0.08, 1 + S.up.bag * 0.1, 1 + S.up.bag * 0.08);
-    m.packMat.color.setHex(LEVEL_COLORS.pack[S.up.bag]);
+    for (const k of ['axe', 'pick']) m.tools[k].scale.setScalar(1 + S.tool[k] * 0.12);
+    m.shoe.color.setHex(LEVEL_COLORS.shoe[Math.min(3, Math.ceil(S.up.speed / 3))]);
+    // 防具：よろいの色
+    m.armor.visible = a.id !== 'cloth';
+    m.armorMat.color.setHex(a.color);
+    m.pack.scale.set(1 + S.up.bag * 0.05, 1 + S.up.bag * 0.06, 1 + S.up.bag * 0.05);
+    m.packMat.color.setHex(LEVEL_COLORS.pack[Math.min(5, Math.ceil(S.up.bag / 2))]);
   }
 
   setTool(name) {
@@ -56,6 +62,8 @@ export class Player {
 
   damage(n, fx, fz) {
     if (!this.alive || this.invul > 0) return;
+    // 防具の守りの分だけ減らす（半分より下にはならない）
+    n = Math.max(Math.ceil(n * 0.4), n - stat.def());
     this.hp = Math.max(0, this.hp - n);
     this.invul = 0.7; this.sinceHit = 0; this.hurtT = 0.25;
     const dx = this.pos.x - fx, dz = this.pos.z - fz, d = Math.hypot(dx, dz) || 1;

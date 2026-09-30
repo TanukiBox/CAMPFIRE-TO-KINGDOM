@@ -227,7 +227,39 @@ html, body {
 .st-label.store { border-color: #e0a090; flex-wrap: wrap; max-width: 220px; justify-content: center; }
 
 /* メニュー */
-.sheet-upgrade, .sheet-smithy, .sheet-hire, .sheet-clear, .sheet-away { max-height: 86vh; overflow-y: auto; }
+.sheet-upgrade, .sheet-smithy, .sheet-hire, .sheet-clear, .sheet-away, .sheet-book { max-height: 86vh; overflow-y: auto; }
+/* レベルと経験値 */
+.pill.lv { gap: 5px; padding-left: 9px; }
+.pill.lv b { color: #7a4fc0; font-size: 13px; }
+.xpbar { width: 54px; height: 8px; border-radius: 5px; background: #eadff5; overflow: hidden; display: block; }
+.xpbar b { display: block; height: 100%; width: 0; background: linear-gradient(#c79bff, #8a5ad9); border-radius: 5px; transition: width .3s; }
+.pill.lv.shine { animation: lvshine 1s ease-out; }
+@keyframes lvshine { 0% { background: #fff3a0; border-color: #ffd34d; transform: scale(1.2); } 100% { transform: scale(1); } }
+.float.xp { color: #d9b8ff; font-size: 14px; }
+/* 住民の依頼 */
+.req {
+  display: flex; align-items: center; gap: 3px; background: #fff; border: 2px solid #f0a870; border-radius: 12px; padding: 1px 8px 1px 4px;
+  font-weight: 800; font-size: 13px; box-shadow: var(--shadow); translate: -50% -100%; animation: hop .7s ease-in-out infinite alternate;
+}
+.req i { font-style: normal; color: #e8742c; font-size: 15px; min-width: 12px; text-align: center; }
+.req .ico { width: 22px; height: 22px; }
+.req.ready { border-color: #7cc95a; background: #eefbe6; }
+.req.ready i { color: #3c9a2a; }
+.req.edge { animation: none; }
+/* 鍛冶屋・図鑑 */
+.row.on { border-color: #f1b14a; background: #fff8e4; }
+.row .stat { font-size: 12px; color: #7a4fc0; font-weight: 800; }
+.sheet button.buy.eq { background: #eef4ff; border-color: #a9c3ee; color: #3a5a9a; }
+.book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.book-card { background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 1px; text-align: center; }
+.book-card .ico { width: 40px; height: 40px; }
+.book-card b { font-size: 12px; line-height: 1.2; }
+.book-card small { font-size: 11px; color: #8a7058; }
+.book-card.unk { background: #f3ece0; }
+.book-card.unk b { color: #a89680; }
+.book-card.boss { border-color: #e8a0a0; }
+.book-card .ico.mini, .costs .ico.mini { width: 16px; height: 16px; }
+.book-sum { text-align: center; font-weight: 800; font-size: 13px; color: #7a4fc0; margin: 0; }
 .sheet h2 { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .sheet h2 .ico { width: 26px; height: 26px; }
 .sheet .sub { margin: -6px 0 2px; text-align: center; font-size: 13px; color: #8a7058; }

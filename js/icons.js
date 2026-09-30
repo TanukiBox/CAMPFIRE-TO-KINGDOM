@@ -1,4 +1,5 @@
 // 画面表示用の小さな絵（コードで描く）
+import { WEAPONS, ARMORS, ENEMY_TYPES } from './data.js';
 const cache = new Map();
 
 const DRAW = {
@@ -147,12 +148,126 @@ function round(g, x, y, w, h, r) {
 }
 function poly(g, pts) { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); }
 
+// ---- 装備・モンスター・図鑑の絵 ----
+const hex = c => '#' + c.toString(16).padStart(6, '0');
+function shade(c, k) {
+  const r = Math.min(255, Math.round((c >> 16 & 255) * k)), g = Math.min(255, Math.round((c >> 8 & 255) * k)), b = Math.min(255, Math.round((c & 255) * k));
+  return `rgb(${r},${g},${b})`;
+}
+function drawWeapon(g, w) {
+  const L = 8 + (w.len - 1) * 30;
+  if (w.glow) { g.fillStyle = hex(w.color) + '55'; g.beginPath(); g.arc(28, 20, 16, 0, 7); g.fill(); }
+  g.fillStyle = hex(w.color); poly(g, [[36 + L * 0.1, 4], [42 + L * 0.1, 6], [20, 30], [16, 27]]); g.fill();
+  g.fillStyle = shade(w.color, 0.75); poly(g, [[39 + L * 0.1, 5], [42 + L * 0.1, 6], [20, 30], [18, 28.5]]); g.fill();
+  g.fillStyle = w.id === 'dragon' ? '#e24b4b' : '#f5c542'; poly(g, [[10, 24], [14, 20], [26, 32], [22, 36]]); g.fill();
+  g.fillStyle = '#6b3f22'; poly(g, [[16, 32], [19, 35], [10, 44], [7, 41]]); g.fill();
+}
+function drawArmor(g, a) {
+  g.fillStyle = shade(a.color, 0.8); round(g, 8, 10, 32, 30, 8); g.fill();
+  g.fillStyle = hex(a.color); poly(g, [[12, 12], [20, 8], [24, 14], [28, 8], [36, 12], [36, 38], [12, 38]]); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.45)'; g.fillRect(15, 16, 5, 16);
+  g.fillStyle = shade(a.color, 0.65); g.fillRect(12, 30, 24, 4);
+  if (a.id === 'cloth') { g.fillStyle = '#f5e6c8'; g.fillRect(22, 14, 4, 16); }
+}
+function eyes(g, x, y, gap, r = 2.6) {
+  g.fillStyle = '#2b1d14';
+  g.beginPath(); g.arc(x - gap, y, r, 0, 7); g.arc(x + gap, y, r, 0, 7); g.fill();
+}
+function drawMonster(g, type, def) {
+  const c = hex(def.color), d = shade(def.color, 0.75), l = shade(def.color, 1.25);
+  switch (def.rig) {
+    case 'slime': case 'boss':
+      g.fillStyle = d; g.beginPath(); g.ellipse(24, 32, 19, 13, 0, 0, 7); g.fill();
+      g.fillStyle = c; g.beginPath(); g.moveTo(5, 34); g.quadraticCurveTo(8, 8, 24, 8); g.quadraticCurveTo(40, 8, 43, 34); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.ellipse(16, 17, 4, 2.5, -0.6, 0, 7); g.fill();
+      eyes(g, 24, 25, 6);
+      if (def.rig === 'boss') { g.fillStyle = '#ffcf3a'; poly(g, [[14, 10], [14, 2], [19, 6], [24, 0], [29, 6], [34, 2], [34, 10]]); g.fill(); }
+      break;
+    case 'mushroom':
+      g.fillStyle = '#f2e6cf'; round(g, 16, 22, 16, 20, 5); g.fill();
+      g.fillStyle = c; g.beginPath(); g.ellipse(24, 22, 20, 13, 0, Math.PI, 0); g.fill();
+      g.fillStyle = '#fff'; for (const [x, y] of [[15, 16], [26, 12], [33, 18]]) { g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill(); }
+      eyes(g, 24, 30, 4, 2);
+      break;
+    case 'wolf': case 'boar': case 'lizard':
+      g.fillStyle = d; for (const x of [12, 18, 30, 36]) g.fillRect(x, 30, 4, 12);
+      g.fillStyle = c; g.beginPath(); g.ellipse(24, 28, 16, 9, 0, 0, 7); g.fill();
+      g.beginPath(); g.ellipse(39, 20, 8, 7, 0, 0, 7); g.fill();
+      if (def.rig === 'wolf') { poly(g, [[35, 14], [37, 5], [41, 13]]); g.fill(); g.fillStyle = l; poly(g, [[8, 26], [2, 16], [10, 22]]); g.fill(); }
+      if (def.rig === 'boar') { g.fillStyle = '#f2efe6'; poly(g, [[44, 24], [47, 17], [45, 26]]); g.fill(); g.fillStyle = d; g.fillRect(24, 18, 12, 3); }
+      if (def.rig === 'lizard') { g.fillStyle = c; poly(g, [[9, 26], [1, 36], [12, 31]]); g.fill(); g.fillStyle = '#ffc04a'; for (const x of [18, 24, 30]) { g.beginPath(); g.arc(x, 24, 2, 0, 7); g.fill(); } }
+      g.fillStyle = '#2b1d14'; g.beginPath(); g.arc(41, 18, 2, 0, 7); g.fill();
+      break;
+    case 'crab':
+      g.fillStyle = d; for (const x of [10, 16, 30, 36]) g.fillRect(x, 30, 3, 10);
+      g.fillStyle = c; g.beginPath(); g.ellipse(24, 28, 16, 10, 0, Math.PI, 0); g.fill(); g.fillRect(8, 27, 32, 5);
+      g.beginPath(); g.arc(7, 18, 6, 0, 7); g.arc(41, 18, 6, 0, 7); g.fill();
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(19, 16, 3.5, 0, 7); g.arc(29, 16, 3.5, 0, 7); g.fill();
+      eyes(g, 24, 16, 5, 1.8);
+      break;
+    case 'bee':
+      g.fillStyle = 'rgba(220,240,255,.9)'; g.beginPath(); g.ellipse(18, 12, 8, 6, -0.5, 0, 7); g.ellipse(30, 12, 8, 6, 0.5, 0, 7); g.fill();
+      g.fillStyle = c; g.beginPath(); g.ellipse(24, 28, 15, 11, 0, 0, 7); g.fill();
+      g.fillStyle = '#3a2a1a'; g.fillRect(18, 18, 4, 20); g.fillRect(27, 18, 4, 20);
+      eyes(g, 36, 25, 0, 2.2);
+      break;
+    case 'drake': case 'dragon':
+      g.fillStyle = d; poly(g, [[20, 22], [2, 6], [8, 24]]); g.fill(); poly(g, [[28, 22], [46, 6], [40, 24]]); g.fill();
+      g.fillStyle = c; g.beginPath(); g.ellipse(24, 30, 12, 11, 0, 0, 7); g.fill();
+      g.beginPath(); g.ellipse(24, 15, 8, 7, 0, 0, 7); g.fill();
+      g.fillStyle = '#f2efe6'; poly(g, [[18, 10], [16, 3], [21, 8]]); g.fill(); poly(g, [[30, 10], [32, 3], [27, 8]]); g.fill();
+      g.fillStyle = l; g.beginPath(); g.ellipse(24, 33, 6, 6, 0, 0, 7); g.fill();
+      eyes(g, 24, 15, 3.5, 1.8);
+      break;
+    case 'wisp':
+      g.fillStyle = shade(def.color, 0.9); g.beginPath(); g.moveTo(24, 2); g.quadraticCurveTo(44, 24, 36, 38); g.quadraticCurveTo(24, 48, 12, 38); g.quadraticCurveTo(4, 24, 24, 2); g.fill();
+      g.fillStyle = '#ffe07a'; g.beginPath(); g.ellipse(24, 32, 9, 10, 0, 0, 7); g.fill();
+      eyes(g, 24, 30, 4, 2);
+      break;
+    default: {
+      // 人の形（ゴブリン・トロル・がいこつ・岩の巨人）
+      const golem = def.rig === 'golem';
+      g.fillStyle = d; g.fillRect(15, 34, 6, 10); g.fillRect(27, 34, 6, 10);
+      g.fillStyle = c;
+      if (golem) { g.fillRect(8, 18, 32, 20); g.fillRect(2, 20, 8, 16); g.fillRect(38, 20, 8, 16); g.fillRect(16, 6, 16, 13); }
+      else { round(g, 12, 22, 24, 16, 5); g.fill(); g.beginPath(); g.arc(24, 14, 10, 0, 7); g.fill(); }
+      if (def.rig === 'goblin' || def.rig === 'chief') { poly(g, [[14, 12], [4, 8], [15, 17]]); g.fill(); poly(g, [[34, 12], [44, 8], [33, 17]]); g.fill(); }
+      if (def.rig === 'chief') { g.fillStyle = '#ffcf3a'; poly(g, [[16, 6], [16, 0], [20, 3], [24, -1], [28, 3], [32, 0], [32, 6]]); g.fill(); }
+      if (def.rig === 'troll') { g.fillStyle = '#f2efe6'; poly(g, [[16, 7], [12, -1], [19, 5]]); g.fill(); poly(g, [[32, 7], [36, -1], [29, 5]]); g.fill(); }
+      if (def.rig === 'skeleton') { g.fillStyle = '#9a948a'; for (const y of [25, 29, 33]) g.fillRect(16, y, 16, 1.5); }
+      eyes(g, 24, golem ? 12 : 14, 4, def.rig === 'skeleton' ? 3 : 2.2);
+    }
+  }
+}
+function drawBook(g) {
+  g.fillStyle = '#8a5a33'; round(g, 8, 6, 32, 38, 5); g.fill();
+  g.fillStyle = '#f5ecd8'; g.fillRect(12, 9, 26, 32);
+  g.fillStyle = '#b0773f'; round(g, 8, 6, 28, 38, 5); g.fill();
+  g.fillStyle = '#ffcf3a'; g.beginPath(); g.arc(22, 22, 7, 0, 7); g.fill();
+  g.fillStyle = '#e8742c'; g.beginPath(); g.arc(22, 22, 3.5, 0, 7); g.fill();
+  g.fillStyle = '#6b3f22'; g.fillRect(12, 34, 20, 3);
+}
+function drawSpecial(g, kind) {
+  if (kind === 'book') { drawBook(g); return true; }
+  if (kind.startsWith('w_')) { const w = WEAPONS.find(x => x.id === kind.slice(2)); if (w) { drawWeapon(g, w); return true; } }
+  if (kind.startsWith('a_')) { const a = ARMORS.find(x => x.id === kind.slice(2)); if (a) { drawArmor(g, a); return true; } }
+  if (kind.startsWith('m_')) {
+    const sil = kind.endsWith('_sil'), type = kind.slice(2, sil ? -4 : undefined), def = ENEMY_TYPES[type];
+    if (!def) return false;
+    drawMonster(g, type, def);
+    // まだ出会っていないモンスターは影だけ
+    if (sil) { g.globalCompositeOperation = 'source-in'; g.fillStyle = 'rgba(90,74,62,.45)'; g.fillRect(0, 0, 48, 48); g.globalCompositeOperation = 'source-over'; }
+    return true;
+  }
+  return false;
+}
+
 export function icon(kind) {
   if (!cache.has(kind)) {
     const c = document.createElement('canvas');
     c.width = c.height = 48;
     const g = c.getContext('2d');
-    (DRAW[kind] || DRAW.stone)(g);
+    if (!drawSpecial(g, kind)) (DRAW[kind] || DRAW.stone)(g);
     cache.set(kind, c.toDataURL());
   }
   return cache.get(kind);
