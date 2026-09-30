@@ -14,7 +14,7 @@ export const ui = {
   init(game) {
     this.game = game;
     $('sheetModal').addEventListener('pointerdown', e => {
-      if (e.target.id === 'sheetModal' && ['upgrade', 'smithy', 'hire', 'book', 'store'].includes(this.open)) this.close();
+      if (e.target.id === 'sheetModal' && ['upgrade', 'smithy', 'hire', 'book', 'store', 'bag'].includes(this.open)) this.close();
     });
     $('sheet').addEventListener('click', e => {
       const b = e.target.closest('button[data-act]');
@@ -28,6 +28,7 @@ export const ui = {
       else if (act === 'fac') { game.buyFacility(arg); this.render(); }
       else if (act === 'jobup') { game.buyJob(arg); this.render(); }
       else if (act === 'craft') { const [k, id] = arg.split('.'); game.craft(k, id); this.render(); }
+      else if (act === 'drop') { const [k, n] = arg.split('.'); game.discard(k, n === 'all' ? Infinity : +n); this.render(); }
       else if (act === 'sell') { const [k, n] = arg.split('.'); game.sellStorage(k, n === 'all' ? Infinity : +n); this.render(); }
       else if (act === 'equip') { const [k, id] = arg.split('.'); game.equip(k, id); this.render(); }
       else if (act === 'keep') { this.close(); game.afterClear(); }
@@ -51,7 +52,7 @@ export const ui = {
 
   render() {
     const f = this['r_' + this.open];
-    const x = ['upgrade', 'smithy', 'hire', 'book', 'store'].includes(this.open) ? `<button class="x-close" data-act="close" aria-label="${t('close')}">×</button>` : '';
+    const x = ['upgrade', 'smithy', 'hire', 'book', 'store', 'bag'].includes(this.open) ? `<button class="x-close" data-act="close" aria-label="${t('close')}">×</button>` : '';
     if (f) $('sheet').innerHTML = x + f.call(this, this.data);
   },
 
@@ -183,6 +184,16 @@ export const ui = {
     }
     const found = keys.filter(k => (tab === 'mon' ? S.book.mon : tab === 'mat' ? S.book.mat : S.book.dish)[k]).length;
     return `<h2>${iconImg('book')} ${t('bookTitle')}</h2>${tabs}<p class="book-sum">${t('bkFound', { n: found, m: keys.length })}</p><div class="book-grid">${cards}</div>`;
+  },
+
+  // 背中の荷物：選んで捨てる
+  r_bag() {
+    const g = this.game, list = g.bagList(), need = g.neededKinds(), total = list.reduce((a, [, n]) => a + n, 0);
+    const rows = list.length ? list.map(([k, n]) => {
+      const b = (m, label) => `<button class="buy sell drop" data-act="drop:${k}.${m}" ${m !== 'all' && n < m ? 'disabled' : ''}>${label}</button>`;
+      return `<div class="row"><div class="row-ico">${iconImg(k)}</div><div class="row-main"><b>${t('m_' + k)} <span class="cnt">×${n}</span></b>${need.has(k) ? `<small class="need">${t('bagNeed')}</small>` : ''}</div><div class="sell-btns">${b(1, t('sellN', { n: 1 }))}${b(10, t('sellN', { n: 10 }))}${b('all', t('sellAll'))}</div></div>`;
+    }).join('') : `<p class="sub">${t('bagEmpty')}</p>`;
+    return `<h2>${iconImg('bag')} ${t('bagTitle')}</h2><p class="book-sum">${total} / ${g.bagCap()}</p><p class="sub">${t('bagDesc')}</p>${rows}`;
   },
 
   // 倉庫：中身を選んで売る

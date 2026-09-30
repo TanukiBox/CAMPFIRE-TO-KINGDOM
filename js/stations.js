@@ -82,8 +82,7 @@ export class Stations {
       }
     }
     // 焚き火にくべるマス（最初からある）
-    this.burn = { pos: { x: ch.burn[0], z: ch.burn[1] }, fire: { x: ch.campfire[0], z: ch.campfire[1] }, hold: 0, depT: 0, told: false,
-      tile: place(tileModel({ size: 1.5, mark: 'none', plate: 0xffd9b0, border: 0xd9642a }), ch.burn[0], ch.burn[1]) };
+
   }
 
   st(p) {
@@ -268,7 +267,7 @@ export class Stations {
         a.inside = inside;
       }
     }
-    if (!drawOnly) { this.updateBurn(dt, time, player, hooks); this.updateStorage(dt, time, player, hooks); }
+    if (!drawOnly) this.updateStorage(dt, time, player, hooks);
     for (const sh of this.shops) this.updateShop(sh, dt, time, player, hooks, drawOnly);
     this.updateInn(dt, time, player, hooks, drawOnly);
   }
@@ -317,30 +316,6 @@ export class Stations {
     for (const m of INGREDIENTS) for (let j = 0; j < Math.min(this.inCount(p, m), 4) && i < 16; j++, i++) { pileSpot(i, m, p.inPos.x, p.inPos.z, _v); this.items.draw(m, _v.x, _v.y, _v.z, 0); }
   }
 
-  // 焚き火にくべる：少し立っていると、今使わない素材から燃やす
-  updateBurn(dt, time, player, hooks) {
-    const b = this.burn;
-    const on = player.alive && near(player.pos, b.pos.x, b.pos.z, 0.8);
-    b.tile.inner.material.opacity = on ? 0.35 + Math.min(1, b.hold / 0.6) * 0.4 : 0.25 + Math.sin(time * 3) * 0.06;
-    if (!on) { b.hold = 0; b.depT = 0; b.told = false; return; }
-    b.hold += dt;
-    if (b.hold < 0.6) return;
-    const need = hooks.neededKinds();
-    b.depT -= dt;
-    while (b.depT <= 0) {
-      b.depT += 0.06;
-      const it = this.items.take(player, k => !need.has(k));
-      if (!it) {
-        if (!b.told && player.bag.length) { b.told = true; hooks.onBurnNone(); }
-        b.depT = 0; break;
-      }
-      this.items.flyTo(it, b.fire.x, 0.5, b.fire.z, 0.35, () => {
-        burst(b.fire.x, 0.7, b.fire.z, { n: 5, colors: [0xff7a2a, 0xffb23a, 0xffe46a, 0x555555], speed: 1.5, up: 4, size: 0.12, life: 0.6, g: -2, floor: false });
-        hooks.onBurn();
-      });
-    }
-  }
-
   // 倉庫：マスに立つと背中の素材をぜんぶ預ける
   updateStorage(dt, time, player, hooks) {
     const st = this.storage;
@@ -369,7 +344,7 @@ export class Stations {
     c.moving = d > 0.12 ? 1 : 0;
     if (!c.moving) return true;
     // 建物がじゃまなら、角を回って進む
-    const wp = this.world ? this.world.detour(c.x, c.z, c.tx, c.tz, 0.6) : null;
+    const wp = this.world ? this.world.steer(c, c.tx, c.tz) : null;
     const gx = wp ? wp.x : c.tx, gz = wp ? wp.z : c.tz;
     const dx = gx - c.x, dz = gz - c.z, dd = Math.hypot(dx, dz) || 1;
     const sp = Math.min(dd, speed * dt);

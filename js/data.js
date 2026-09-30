@@ -2,6 +2,8 @@
 
 // 主人公の基本の強さ（強化で変わるものは UPGRADES / TOOLS）
 export const PLAYER = {
+  dropBonus: 0.35,   // モンスターを倒したとき、素材が1個多く出る確率
+  crit: 0.12, critMul: 2,   // 会心の一撃の確率と倍率
   regenDelay: 4,       // 攻撃を受けてから回復が始まるまでの秒数
   regenPerSec: 0.8,
   reachEnemy: 1.5,
@@ -14,7 +16,7 @@ export const PLAYER = {
 export const FACILITY = {
   cap: [1, 1.7, 2.5, 3.5, 5],
   speed: [1, 1.4, 1.9, 2.5, 3.2],
-  costs: [{ coin: 150, plank: 20 }, { coin: 600, block: 30, ore: 10 }, { coin: 2000, block: 60, gold: 10 }, { coin: 5000, gold: 30, scale: 10 }],
+  costs: [{ coin: 150, plank: 20 }, { coin: 600, block: 30, ore: 10 }, { coin: 2000, block: 60, gold: 10 }, { coin: 5000, gold: 30, scale: 6 }],
 };
 // 住民の仕事の強化（Lv1〜5）。1レベルごとに 運べる数+2・歩く速さ+12%・作業の速さ+25%・兵士の攻撃力+35%
 export const JOB_UP = { costs: [100, 400, 1200, 3000], carry: 2, walk: 0.12, work: 0.25, dmg: 0.35 };
@@ -28,7 +30,7 @@ export const STORAGE = {
     { plank: 20, block: 20, coin: 150 },
     { plank: 40, block: 40, ore: 10, coin: 500 },
     { block: 60, ore: 30, gold: 8, coin: 1500 },
-    { block: 100, gold: 20, scale: 6, coin: 4000 },
+    { block: 100, gold: 20, scale: 4, coin: 4000 },
   ],
 };
 
@@ -50,7 +52,7 @@ export const WEAPONS = [
   { id: 'bone',    atk: 14, cost: { bone: 12, ore: 10, coin: 600 }, color: 0xf2efe6, len: 1.25 },
   { id: 'gold',    atk: 20, cost: { gold: 16, horn: 6, coin: 1200 }, color: 0xffd34d, len: 1.3 },
   { id: 'flame',   atk: 28, cost: { firestone: 8, tail: 8, gold: 10, coin: 2500 }, color: 0xff7a2a, len: 1.35, glow: true },
-  { id: 'dragon',  atk: 40, cost: { scale: 20, firestone: 10, gold: 20, coin: 5000 }, color: 0xb04ad0, len: 1.45, glow: true },
+  { id: 'dragon',  atk: 40, cost: { scale: 12, firestone: 8, gold: 20, coin: 5000 }, color: 0xb04ad0, len: 1.45, glow: true },
 ];
 export const ARMORS = [
   { id: 'cloth',  def: 0, hp: 0,  cost: null, color: 0x4f86d9 },
@@ -58,7 +60,7 @@ export const ARMORS = [
   { id: 'fur',    def: 2, hp: 10, cost: { fur: 10, cloth: 6, coin: 200 }, color: 0xc9a27a },
   { id: 'bone',   def: 4, hp: 18, cost: { bone: 14, horn: 4, coin: 700 }, color: 0xf2efe6 },
   { id: 'gold',   def: 6, hp: 28, cost: { gold: 20, bone: 8, coin: 1500 }, color: 0xffd34d },
-  { id: 'dragon', def: 9, hp: 45, cost: { scale: 24, firestone: 8, coin: 4000 }, color: 0xb04ad0 },
+  { id: 'dragon', def: 9, hp: 45, cost: { scale: 14, firestone: 6, coin: 4000 }, color: 0xb04ad0 },
 ];
 
 // 住民の依頼：ときどき住民が「○○がほしい」「○○を倒して」とたのむ。かなえるとコインと経験値
@@ -66,8 +68,8 @@ export const REQUESTS = { every: [50, 90], max: 2, names: { ja: ['ミナ', 'ソ�
 
 // 鍛冶屋での強化（素材＋コイン）。素材は背中から使う
 export const TOOLS = {
-  axe:   { values: [1, 2, 3, 4, 5, 6], swing: [0.5, 0.42, 0.36, 0.32, 0.28, 0.26], costs: [{ plank: 5, coin: 40 }, { block: 6, coin: 120 }, { ore: 8, coin: 300 }, { gold: 8, coin: 900 }, { scale: 6, coin: 2500 }] },
-  pick:  { values: [1, 2, 3, 4, 5, 6], swing: [0.55, 0.46, 0.4, 0.34, 0.3, 0.28], costs: [{ plank: 5, coin: 50 }, { block: 6, coin: 140 }, { ore: 8, coin: 300 }, { gold: 8, coin: 900 }, { scale: 6, coin: 2500 }] },
+  axe:   { values: [1, 2, 3, 4, 5, 6], swing: [0.5, 0.42, 0.36, 0.32, 0.28, 0.26], costs: [{ plank: 5, coin: 40 }, { block: 6, coin: 120 }, { ore: 8, coin: 300 }, { gold: 8, coin: 900 }, { scale: 4, coin: 2500 }] },
+  pick:  { values: [1, 2, 3, 4, 5, 6], swing: [0.55, 0.46, 0.4, 0.34, 0.3, 0.28], costs: [{ plank: 5, coin: 50 }, { block: 6, coin: 140 }, { ore: 8, coin: 300 }, { gold: 8, coin: 900 }, { scale: 4, coin: 2500 }] },
 };
 
 // 素材。h = 背中に積んだときの1個の高さ、price = お店で売れる値段（ないものは売らない）
@@ -187,12 +189,12 @@ export const ENEMY_TYPES = {
   lizard: {
     rig: 'lizard', move: 'walk', hp: 60, speed: 1.4, chase: 3.2, dmg: 6,
     aggro: 6, leash: 10, atkRange: 1.3, atkCd: 1.2,
-    drop: { tail: 2 }, coins: 20, respawn: 22, color: 0xe8603a, size: 1.2, radius: 0.5, xp: 24,
+    drop: { tail: 2, scale: 1 }, coins: 20, respawn: 22, color: 0xe8603a, size: 1.2, radius: 0.5, xp: 24,
   },
   drake: {
     rig: 'drake', move: 'walk', fly: 1.2, hp: 90, speed: 1.3, chase: 3.0, dmg: 7,
     aggro: 7, leash: 10, atkRange: 1.4, atkCd: 1.4,
-    drop: { scale: 2 }, coins: 40, respawn: 28, color: 0x7a5ad9, size: 1.3, radius: 0.5, xp: 32,
+    drop: { scale: 3 }, coins: 40, respawn: 28, color: 0x7a5ad9, size: 1.3, radius: 0.5, xp: 32,
   },
   // 新しいモンスター（狩り場にいる）
   bee: {
@@ -283,9 +285,9 @@ export const CHAPTERS = {
     burn: [2.3, -1.7],                 // いらない素材を焚き火にくべるマス
     lands: [
       { id: 'home',  rect: { x0: -17, x1: 17, z0: -17, z1: 13 } },
-      { id: 'east',  rect: { x0: 17, x1: 33, z0: -17, z1: 13 }, hunt: true },
+      { id: 'east',  rect: { x0: 17, x1: 33, z0: -17, z1: 13 }, hunt: true, ground: 'forest' },
       { id: 'north', rect: { x0: -17, x1: 17, z0: -35, z1: -17 } },
-      { id: 'swamp', rect: { x0: 17, x1: 33, z0: -35, z1: -17 }, hunt: true },
+      { id: 'swamp', rect: { x0: 17, x1: 33, z0: -35, z1: -17 }, hunt: true, ground: 'swamp' },
     ],
     nodes: [
       // はじめの土地
@@ -365,8 +367,8 @@ export const CHAPTERS = {
     name: { before: 'ch1_after', after: 'ch2_after' }, title: 'ch2_title',
     lands: [
       { id: 'west',  rect: { x0: -35, x1: -17, z0: -17, z1: 13 } },
-      { id: 'herbs', rect: { x0: -35, x1: -17, z0: -35, z1: -17 }, hunt: true },
-      { id: 'fort',  rect: { x0: -35, x1: -17, z0: 13, z1: 29 }, hunt: true },
+      { id: 'herbs', rect: { x0: -35, x1: -17, z0: -35, z1: -17 }, hunt: true, ground: 'forest' },
+      { id: 'fort',  rect: { x0: -35, x1: -17, z0: 13, z1: 29 }, hunt: true, ground: 'dirt' },
     ],
     nodes: [
       // 鉄の岩山
@@ -436,9 +438,9 @@ export const CHAPTERS = {
     sea: 30.5,   // これより手前（画面の下）は海
     lands: [
       { id: 'harbor', rect: { x0: -17, x1: 33, z0: 13, z1: 29 } },
-      { id: 'ruins',  rect: { x0: 33, x1: 51, z0: -17, z1: 13 }, hunt: true },
+      { id: 'ruins',  rect: { x0: 33, x1: 51, z0: -17, z1: 13 }, hunt: true, ground: 'ruins' },
       { id: 'gold',   rect: { x0: 33, x1: 51, z0: -35, z1: -17 } },
-      { id: 'valley', rect: { x0: 33, x1: 51, z0: 13, z1: 29 }, hunt: true },
+      { id: 'valley', rect: { x0: 33, x1: 51, z0: 13, z1: 29 }, hunt: true, ground: 'rock' },
     ],
     nodes: [
       // 港の土地
@@ -503,8 +505,8 @@ export const CHAPTERS = {
     name: { before: 'ch3_after', after: 'ch4_after' }, title: 'ch4_title',
     lands: [
       { id: 'castle',  rect: { x0: -17, x1: 17, z0: -53, z1: -35 } },
-      { id: 'volcano', rect: { x0: 17, x1: 51, z0: -53, z1: -35 }, hunt: true },
-      { id: 'nest',    rect: { x0: -35, x1: -17, z0: -53, z1: -35 }, hunt: true },
+      { id: 'volcano', rect: { x0: 17, x1: 51, z0: -53, z1: -35 }, hunt: true, ground: 'ash' },
+      { id: 'nest',    rect: { x0: -35, x1: -17, z0: -53, z1: -35 }, hunt: true, ground: 'nest' },
     ],
     nodes: [
       // 城の丘
@@ -528,9 +530,9 @@ export const CHAPTERS = {
       { id: 'castle2',  type: 'build', model: 'castle2', x: 0, z: -46.5, w: 12, d: 8, tile: [0, -39.8], tileSize: 4, cost: { block: 150, gold: 20, ore: 40 },   appear: 'castle2', colliders: [] },
       { id: 'plaza',    type: 'build', model: 'plaza',   x: -11.5, z: -42, w: 7, d: 6, tile: [-11.5, -37.8], cost: { block: 80, plank: 60, medicine: 10 },           appear: 'plaza', colliders: [] },
       { id: 'house9',   type: 'build', model: 'house',   x: 10.5, z: -41, w: 3.4, d: 3.0, tile: [10.5, -38.2], cost: { block: 60, plank: 40, scale: 4 },           appear: 'house9', pop: 2 },
-      { id: 'castle3',  type: 'build', model: 'castle3', x: 0, z: -46.5, w: 12, d: 8, tile: [0, -39.8], tileSize: 4, cost: { block: 150, gold: 40, scale: 15 },  appear: 'castle3', colliders: [] },
-      { id: 'statue',   type: 'build', model: 'statue',  x: -11.5, z: -42.5, w: 1.6, d: 1.6, tile: [-11.5, -38.6], cost: { gold: 50, block: 40, scale: 10 },     appear: 'statue' },
-      { id: 'castle4',  type: 'build', model: 'castle4', x: 0, z: -46.5, w: 12, d: 8, tile: [0, -39.8], tileSize: 4, cost: { scale: 30, gold: 40, plank: 80 },   appear: 'castle4', colliders: [] },
+      { id: 'castle3',  type: 'build', model: 'castle3', x: 0, z: -46.5, w: 12, d: 8, tile: [0, -39.8], tileSize: 4, cost: { block: 150, gold: 40, scale: 10 },  appear: 'castle3', colliders: [] },
+      { id: 'statue',   type: 'build', model: 'statue',  x: -11.5, z: -42.5, w: 1.6, d: 1.6, tile: [-11.5, -38.6], cost: { gold: 50, block: 40, scale: 6 },     appear: 'statue' },
+      { id: 'castle4',  type: 'build', model: 'castle4', x: 0, z: -46.5, w: 12, d: 8, tile: [0, -39.8], tileSize: 4, cost: { scale: 20, gold: 40, plank: 80 },   appear: 'castle4', colliders: [] },
     ],
     boss: 'dragon',
     town: {

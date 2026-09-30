@@ -150,7 +150,7 @@ export class Items {
         if (it.age > 0.3 && player.alive) {
           const dx = it.p.x - player.pos.x, dz = it.p.z - player.pos.z;
           if (dx * dx + dz * dz < 1.8 * 1.8) {
-            if (player.bag.length < player.cap) {
+            if (player.bag.length < player.cap || (hooks.makeRoom && hooks.makeRoom(it.kind))) {
               it.state = 'toBag'; it.t = 0; it.from.copy(it.p);
               player.bag.push(it);
               hooks.onPick && hooks.onPick(it, player.bag.length);

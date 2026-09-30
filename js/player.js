@@ -26,6 +26,13 @@ export class Player {
     this.walk = 0; this.moveAmt = 0;
     this.kx = 0; this.kz = 0;
     this.fullNear = false;
+    // 剣の軌跡
+    const tg = new THREE.RingGeometry(0.55, 1.45, 18, 1, -0.75, 2.5).rotateY(-Math.PI / 2);
+    this.trailMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+    this.trail = new THREE.Mesh(tg, this.trailMat);
+    this.trail.position.set(0.28, 0.95, 0.1);
+    this.trail.visible = false;
+    this.m.root.add(this.trail);
   }
 
   // 強化の値を反映し、見た目も変える
@@ -154,6 +161,15 @@ export class Player {
       else { const k = (t - 0.6) / 0.4; arm = 0.1 + (IDLE_ARM - 0.1) * k; lean = 0.22 * (1 - k); }
     }
     m.armR.rotation.x = arm;
+    // 剣を振ったときだけ、振り下ろす間に光の弧を出す
+    const tr = t >= 0.4 && t < 0.85 && this.tool === 'sword';
+    this.trail.visible = tr;
+    if (tr) {
+      const k = (t - 0.4) / 0.45;
+      this.trailMat.opacity = (k < 0.25 ? k / 0.25 : 1 - (k - 0.25) / 0.75) * 0.75;
+      this.trailMat.color.setHex(weaponOf().glow ? weaponOf().color : 0xfff6d0);
+      this.trail.scale.setScalar(weaponOf().len);
+    }
     m.body.rotation.x = lean;
     if (!this.alive) m.body.rotation.z = Math.min(Math.PI / 2, m.body.rotation.z + dt * 6);
     else m.body.rotation.z = 0;

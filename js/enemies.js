@@ -65,17 +65,18 @@ export class Enemies {
   }
 
   // 攻撃を受ける。倒れたら true
-  hit(e, dmg, fx, fz) {
+  hit(e, dmg, fx, fz, kbMul = 1) {
     if (!e.alive) return false;
     e.hp -= dmg;
     e.flash = 0.14;
+    e.squash = 0.3;
     e.hpShow = 4;
     const dx = e.x - fx, dz = e.z - fz, d = Math.hypot(dx, dz) || 1;
-    const kb = e.def.boss ? 0.6 : 6;
+    const kb = (e.def.boss ? 0.6 : 6) * kbMul;
     e.kx = dx / d * kb; e.kz = dz / d * kb;
     if (!e.def.boss) e.cd = Math.max(e.cd, 0.5);
     if (e.hp <= 0) {
-      e.alive = false; e.respawnT = e.def.respawn;
+      e.alive = false; e.respawnT = e.def.respawn; e.dieT = 0.16;
       if (e.minion) this.list.splice(this.list.indexOf(e), 1);
       return true;
     }
@@ -98,12 +99,14 @@ export class Enemies {
     for (const e of list) {
       const def = e.def;
       if (!e.alive) {
+        if (e.dieT > 0) { e.dieT -= dt; e.x += (e.kx || 0) * dt * 0.5; e.z += (e.kz || 0) * dt * 0.5; }
         if (def.boss || e.minion) continue;
         e.respawnT -= dt;
         if (e.respawnT <= 0) { e.alive = true; e.hp = def.hp; e.state = 'spawn'; e.t = 0; this.place(e); }
         continue;
       }
       e.flash = Math.max(0, e.flash - dt);
+      e.squash = Math.max(0, (e.squash || 0) - dt);
       e.hpShow = Math.max(0, (e.hpShow || 0) - dt);
       e.cd = Math.max(0, e.cd - dt);
       e.lunge = Math.max(0, (e.lunge || 0) - dt);
@@ -290,7 +293,8 @@ export class Enemies {
   render(blobs) {
     for (const k in this.rigs) this.rigs[k].begin();
     for (const e of this.list) {
-      if (!e.alive) continue;
+      const dying = !e.alive && e.dieT > 0;
+      if (!e.alive && !dying) continue;
       const def = e.def, rig = this.rigs[def.rig];
       let sx = 1, sy = 1;
       const y = e.hopY || 0;
@@ -300,7 +304,10 @@ export class Enemies {
       else if (!HOPPERS.includes(def.rig)) { sy = 1 + Math.sin(e.walk * 2) * 0.04; }
       else if (y > 0.02) { sy = 1.12; sx = 0.92; }
       else { const ph = (e.hop % 1); sy = 0.86 + ph * 0.1; sx = 1.08 - ph * 0.06; }
-      if (e.flash > 0) { sx *= 1.15; sy *= 0.85; }
+      // 当たるとぷるんとつぶれる
+      if (e.squash > 0) { const k = e.squash / 0.3, w = Math.cos((1 - k) * 16) * k; sx *= 1 + 0.32 * w; sy *= 1 - 0.3 * w; }
+      // 倒れるときは白く光ってふくらみ、はじける
+      if (dying) { const k = 1 - e.dieT / 0.16; sx *= 1 + k * 0.6; sy *= 1 - k * 0.5; }
       const sz = def.size;
       _q.setFromAxisAngle(UP, e.yaw);
       _m.compose(_p.set(e.x, y, e.z), _q, _s.set(sx * sz, sy * sz, sx * sz));
@@ -317,8 +324,8 @@ export class Enemies {
             ang[7] = ang[6]; ang[8] = ang[5];
           }
         }
-        rig.push(_m, ang, e.flash > 0 ? _w : e.color);
-      } else rig.push(_m, null, e.flash > 0 ? _w : e.color);
+        rig.push(_m, ang, e.flash > 0 || dying ? _w : e.color);
+      } else rig.push(_m, null, e.flash > 0 || dying ? _w : e.color);
       blobs.push(e.x, e.z, 0.45 * sz * Math.max(0.3, 1 - y * 0.25));
     }
     for (const k in this.rigs) this.rigs[k].end();

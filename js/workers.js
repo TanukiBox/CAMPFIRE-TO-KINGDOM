@@ -53,8 +53,8 @@ export class Workers {
   goTo(w, x, z, dt, r = 0.15) {
     const d = Math.hypot(x - w.x, z - w.z);
     if (d < r) { w.moving = 0; return true; }
-    // 建物がじゃまなら、角を回って進む
-    const wp = this.world.detour(w.x, w.z, x, z);
+    // 建物や柵がじゃまなら、よけた道を進む
+    const wp = this.world.steer(w, x, z);
     if (wp) { x = wp.x; z = wp.z; }
     const dx = x - w.x, dz = z - w.z, dd = Math.hypot(dx, dz) || 1;
     const sp = Math.min(dd, SPEED * this.walkMul(w) * dt);

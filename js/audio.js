@@ -61,6 +61,12 @@ export const sfx = {
   chop() { noise(0.08, { v: 0.4, type: 'lowpass', f: 1100 }); tone(150, 0.12, { type: 'triangle', v: 0.4, to: 75 }); },
   rock() { tone(1500, 0.12, { type: 'triangle', v: 0.14, to: 1250 }); tone(2300, 0.07, { v: 0.07 }); noise(0.06, { v: 0.25, type: 'highpass', f: 2600 }); tone(110, 0.08, { type: 'triangle', v: 0.25, to: 70 }); },
   slash() { noise(0.12, { v: 0.3, type: 'bandpass', f: 2400, q: 0.9, to: 700 }); tone(260, 0.1, { type: 'triangle', v: 0.18, to: 130 }); },
+  // 会心の一撃：高い金属音を重ねる
+  crit() { noise(0.16, { v: 0.36, type: 'bandpass', f: 3200, q: 0.8, to: 900 }); tone(1568, 0.18, { type: 'triangle', v: 0.14, to: 1760 }); tone(2349, 0.14, { v: 0.08, at: 0.03 }); tone(90, 0.16, { type: 'triangle', v: 0.3, to: 45 }); },
+  // 手ごたえの低い音（当たったときに重ねる）
+  thud() { tone(120, 0.09, { type: 'sine', v: 0.32, to: 55 }); },
+  // 続けて倒すと音が上がる
+  chain(n) { const f = 523 * Math.pow(2, Math.min(n, 12) / 12); tone(f, 0.12, { type: 'triangle', v: 0.12 }); tone(f * 1.5, 0.12, { type: 'triangle', v: 0.08, at: 0.06 }); },
   kill() { tone(700, 0.2, { v: 0.16, to: 180 }); noise(0.15, { v: 0.2, type: 'lowpass', f: 1400 }); tone(1046, 0.1, { type: 'triangle', v: 0.08, at: 0.12 }); },
   pickup(i) {
     const now = performance.now(); if (now - lastPick < 35) return; lastPick = now;
