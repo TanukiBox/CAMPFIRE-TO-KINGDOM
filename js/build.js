@@ -20,7 +20,8 @@ export class Builds {
         site.fixed.visible = false;
         world.boxes.push({ x0: def.x - def.w / 2, x1: def.x + def.w / 2, z0: def.z - def.d / 2, z1: def.z + def.d / 2, off: () => !site.done && !site.broken });
       }
-      site.appearAt = Math.max(0, this.missions.findIndex(m => m.id === def.appear));
+      // 前の章の建物はいつでも出せる。今の章の建物はミッションが進むと現れる
+      site.appearAt = def.ch && def.ch < S.ch ? 0 : Math.max(0, this.missions.findIndex(m => m.id === def.appear));
       return site;
     });
     this.count = 0;

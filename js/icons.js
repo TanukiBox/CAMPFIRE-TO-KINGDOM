@@ -78,6 +78,28 @@ const DRAW = {
     g.fillStyle = '#b07a44'; poly(g, [[12, 42], [28, 16], [32, 19], [16, 45]]); g.fill();
     g.fillStyle = '#9aa0a8'; g.beginPath(); g.moveTo(8, 18); g.quadraticCurveTo(28, 2, 44, 20); g.lineTo(40, 22); g.quadraticCurveTo(28, 10, 12, 21); g.closePath(); g.fill();
   },
+  ore(g) {
+    g.fillStyle = '#6e625c'; poly(g, [[8, 32], [14, 14], [30, 8], [42, 16], [42, 34], [26, 40]]); g.fill();
+    g.fillStyle = '#857870'; poly(g, [[14, 14], [30, 8], [42, 16], [26, 22]]); g.fill();
+    g.fillStyle = '#e0823c'; poly(g, [[18, 26], [24, 22], [28, 28], [22, 32]]); g.fill(); poly(g, [[32, 16], [36, 14], [37, 20]]); g.fill();
+  },
+  fur(g) {
+    g.fillStyle = '#c9a27a'; round(g, 6, 14, 36, 22, 9); g.fill();
+    g.fillStyle = '#e0c29c'; round(g, 10, 18, 28, 8, 4); g.fill();
+    g.fillStyle = '#a8805a'; for (const x of [12, 20, 28, 36]) { g.beginPath(); g.arc(x, 36, 3, 0, Math.PI); g.fill(); }
+  },
+  herb(g) {
+    g.fillStyle = '#4fae45'; g.beginPath(); g.ellipse(17, 24, 7, 15, -0.5, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#5fbf4f'; g.beginPath(); g.ellipse(31, 24, 7, 15, 0.5, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#c98a4b'; g.fillRect(22, 30, 4, 14);
+    g.fillStyle = '#ff8fd0'; g.beginPath(); g.arc(24, 12, 5, 0, Math.PI * 2); g.fill();
+  },
+  medicine(g) {
+    g.fillStyle = '#e8506a'; round(g, 12, 20, 24, 22, 8); g.fill();
+    g.fillStyle = '#f4f4f4'; g.fillRect(19, 12, 10, 9);
+    g.fillStyle = '#a8713e'; g.fillRect(18, 7, 12, 6);
+    g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.ellipse(18, 27, 3, 5, 0, 0, Math.PI * 2); g.fill();
+  },
   heart(g) {
     g.fillStyle = '#ef4f5f';
     g.beginPath(); g.moveTo(24, 40);

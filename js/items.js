@@ -15,7 +15,8 @@ export class Items {
     this.extras = [];
     this.meshes = {};
     for (const k in MATERIALS) {
-      const m = new THREE.InstancedMesh(itemGeo(k), k === 'wood' ? mat(0xffffff, { vertexColors: true }) : mat(MATERIALS[k].color), CAP);
+      const geo = itemGeo(k);
+      const m = new THREE.InstancedMesh(geo, geo.attributes.color ? mat(0xffffff, { vertexColors: true }) : mat(MATERIALS[k].color), CAP);
       m.frustumCulled = false; m.count = 0;
       m.setColorAt(0, _c.setHex(0xffffff));
       m.castShadow = false;

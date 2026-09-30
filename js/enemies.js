@@ -2,19 +2,23 @@
 // ぬし（大スライム）は跳び上がって押しつぶす攻撃と、子分を呼ぶ攻撃をする
 import * as THREE from './lib/three.module.min.js';
 import { Rig } from './rig.js';
-import { slimeParts, mushroomParts, bossParts } from './models.js';
+import { slimeParts, mushroomParts, bossParts, wolfParts, goblinParts, chiefParts } from './models.js';
 import { ENEMY_TYPES } from './data.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _w = new THREE.Color(0xffffff);
 const UP = new THREE.Vector3(0, 1, 0);
-const ang = [0, 0, 0, 0, 0, 0, 0];
+const ang = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+const HOPPERS = ['slime', 'boss'];
 
 export class Enemies {
   constructor(ch, world, cap = 220) {
     this.world = world;
     this.list = [];
-    this.rigs = { slime: new Rig(slimeParts(), cap), mushroom: new Rig(mushroomParts(), 60), boss: new Rig(bossParts(), 2) };
-    this.boss = null;
+    this.rigs = {
+      slime: new Rig(slimeParts(), cap), mushroom: new Rig(mushroomParts(), 60), boss: new Rig(bossParts(), 2),
+      wolf: new Rig(wolfParts(), 60), goblin: new Rig(goblinParts(), 60), chief: new Rig(chiefParts(), 2),
+    };
+    this.bosses = [];
     for (const z of ch.spawns) for (let i = 0; i < z.n; i++) this.spawn(z.type, z);
   }
 
@@ -30,7 +34,7 @@ export class Enemies {
       passive: !!opts.passive, minion: !!opts.minion, respawnT: 0, r: def.radius * def.size,
     };
     if (opts.x !== undefined) { e.x = opts.x; e.z = opts.z; e.tx = e.x; e.tz = e.z; } else this.place(e);
-    if (def.boss) { this.boss = e; e.phase = 'idle'; e.pt = 0; e.cycles = 0; e.fight = false; }
+    if (def.boss) { this.bosses.push(e); e.phase = 'idle'; e.pt = 0; e.cycles = 0; e.fight = false; }
     this.list.push(e);
     return e;
   }
@@ -70,11 +74,13 @@ export class Enemies {
 
   // 主人公が倒れたら、ぬしは元気に戻る
   resetBoss() {
-    const b = this.boss;
-    if (!b || !b.alive) return;
-    b.hp = b.def.hp; b.phase = 'idle'; b.fight = false; b.x = b.zone.x; b.z = b.zone.z; b.hopY = 0;
+    for (const b of this.bosses) {
+      if (!b.alive) continue;
+      b.hp = b.def.hp; b.phase = 'idle'; b.fight = false; b.x = b.zone.x; b.z = b.zone.z; b.hopY = 0;
+    }
     for (let i = this.list.length - 1; i >= 0; i--) if (this.list[i].minion) this.list.splice(i, 1);
   }
+  bossOf(type) { return this.bosses.find(b => b.type === type) || null; }
 
   update(dt, player, hooks) {
     const list = this.list, P = player.pos;
@@ -89,6 +95,7 @@ export class Enemies {
       }
       e.flash = Math.max(0, e.flash - dt);
       e.cd = Math.max(0, e.cd - dt);
+      e.lunge = Math.max(0, (e.lunge || 0) - dt);
       if (e.state === 'spawn') { e.t += dt; if (e.t >= 0.5) e.state = 'idle'; continue; }
       if (def.boss) { this.updateBoss(e, dt, player, playerLand, hooks); continue; }
 
@@ -98,7 +105,7 @@ export class Enemies {
       let speed = 0, tx, tz;
       if (chase) {
         tx = P.x; tz = P.z; speed = dp > def.atkRange * 0.8 ? def.chase : 0;
-        if (dp < def.atkRange + e.r * 0.3 && e.cd <= 0) { player.damage(def.dmg, e.x, e.z); e.cd = def.atkCd; e.hop = 0.25; e.lunge = 0.2; }
+        if (dp < def.atkRange + e.r * 0.3 && e.cd <= 0) { player.damage(def.dmg, e.x, e.z); e.cd = def.atkCd; e.hop = 0.25; e.lunge = 0.3; }
       } else {
         e.wait -= dt;
         if (e.wait <= 0) {
@@ -130,7 +137,7 @@ export class Enemies {
 
   move(e, dt, speed, tx, tz, chase) {
     const def = e.def;
-    if (def.move === 'walk') {
+    if (!HOPPERS.includes(def.rig)) {
       e.hopY = 0;
       if (speed > 0) {
         const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz) || 1;
@@ -174,8 +181,24 @@ export class Enemies {
     e.pt += dt;
     if (e.phase === 'chase') {
       this.move(e, dt, def.chase, P.x, P.z, true);
-      if (dp < def.atkRange + e.r * 0.5 && e.cd <= 0) { player.damage(def.dmg, e.x, e.z); e.cd = def.atkCd; }
-      if (e.pt > 3.2) { e.phase = 'charge'; e.pt = 0; e.hopY = 0; }
+      if (dp < def.atkRange + e.r * 0.5 && e.cd <= 0) { player.damage(def.dmg, e.x, e.z); e.cd = def.atkCd; e.lunge = 0.3; }
+      if (e.pt > 3.2) {
+        const atk = def.attacks[e.cycles % def.attacks.length];
+        e.pt = 0; e.hopY = 0;
+        if (atk === 'dash') {
+          e.phase = 'windup';
+          const dx = P.x - e.x, dz = P.z - e.z, d = Math.hypot(dx, dz) || 1;
+          e.ddx = dx / d; e.ddz = dz / d; e.dashHit = false;
+          hooks.onBossDashWarn(e);
+        } else e.phase = 'charge';
+      }
+    } else if (e.phase === 'windup') {
+      e.yaw = Math.atan2(e.ddx, e.ddz);
+      if (e.pt > 0.75) { e.phase = 'dash'; e.pt = 0; hooks.onBossDash(e); }
+    } else if (e.phase === 'dash') {
+      e.x += e.ddx * 11 * dt; e.z += e.ddz * 11 * dt; e.walk += dt * 20;
+      if (!e.dashHit && Math.hypot(P.x - e.x, P.z - e.z) < e.r + 0.7) { e.dashHit = true; player.damage(def.dashDmg, e.x, e.z); }
+      if (e.pt > 0.6) { e.phase = 'rest'; e.pt = 0; e.cycles++; if (e.cycles % 3 === 0) hooks.onBossCall(e); }
     } else if (e.phase === 'charge') {
       this.face(e, P.x - e.x, P.z - e.z, dt);
       if (e.pt > 0.7) {
@@ -186,13 +209,13 @@ export class Enemies {
     } else if (e.phase === 'leap') {
       const k = Math.min(1, e.pt / 1.0);
       e.x = e.fx + (e.lx - e.fx) * k; e.z = e.fz + (e.lz - e.fz) * k;
-      e.hopY = Math.sin(k * Math.PI) * 4.5;
+      e.hopY = Math.sin(k * Math.PI) * (def.rig === 'boss' ? 4.5 : 2.6);
       if (k >= 1) {
         e.hopY = 0; e.phase = 'rest'; e.pt = 0; e.cycles++;
         const hitP = Math.hypot(P.x - e.x, P.z - e.z) < def.slamR;
         hooks.onBossSlam(e, hitP);
         if (hitP) player.damage(def.slamDmg, e.x, e.z);
-        if (e.cycles % 2 === 0) hooks.onBossCall(e);
+        if (e.cycles % (def.attacks.length > 1 ? 3 : 2) === 0) hooks.onBossCall(e);
       }
     } else if (e.phase === 'rest') {
       if (e.pt > 1.4) { e.phase = 'chase'; e.pt = 0; }
@@ -208,17 +231,23 @@ export class Enemies {
       let sx = 1, sy = 1;
       const y = e.hopY || 0;
       if (e.state === 'spawn') { const k = Math.min(1, e.t / 0.5); sx = sy = k * (1.3 - 0.3 * k); }
-      else if (def.move === 'walk') { sy = 1 + Math.sin(e.walk * 2) * 0.04; }
       else if (e.phase === 'charge') { const k = Math.min(1, e.pt / 0.7); sy = 1 - 0.3 * k; sx = 1 + 0.2 * k; }
+      else if (e.phase === 'windup') { sy = 0.9; sx = 1.08; }
+      else if (!HOPPERS.includes(def.rig)) { sy = 1 + Math.sin(e.walk * 2) * 0.04; }
       else if (y > 0.02) { sy = 1.12; sx = 0.92; }
       else { const ph = (e.hop % 1); sy = 0.86 + ph * 0.1; sx = 1.08 - ph * 0.06; }
       if (e.flash > 0) { sx *= 1.15; sy *= 0.85; }
       const sz = def.size;
       _q.setFromAxisAngle(UP, e.yaw);
       _m.compose(_p.set(e.x, y, e.z), _q, _s.set(sx * sz, sy * sz, sx * sz));
-      if (def.move === 'walk') {
+      if (!HOPPERS.includes(def.rig)) {
         const w = Math.sin(e.walk) * 0.6;
-        ang[0] = w; ang[1] = -w;
+        ang.fill(0);
+        if (def.rig === 'wolf') { ang[0] = w; ang[1] = -w; ang[2] = -w; ang[3] = w; }
+        else {
+          ang[0] = w; ang[1] = -w;
+          if (def.rig === 'goblin' || def.rig === 'chief') { ang[5] = -w * 0.8; ang[6] = e.lunge > 0 || e.phase === 'windup' ? -2.2 * (e.phase === 'windup' ? 1 : e.lunge / 0.3) : w * 0.8; }
+        }
         rig.push(_m, ang, e.flash > 0 ? _w : e.color);
       } else rig.push(_m, null, e.flash > 0 ? _w : e.color);
       blobs.push(e.x, e.z, 0.45 * sz * Math.max(0.3, 1 - y * 0.25));

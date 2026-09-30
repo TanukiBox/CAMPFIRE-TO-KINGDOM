@@ -14,6 +14,9 @@ export const S = {
   stations: {},              // 加工場の { in, out, t }
   shop: { stock: { plank: 0, block: 0, jelly: 0 }, coins: 0 },
   storage: {},               // 倉庫の中身
+  market: { stock: {}, coins: 0 },
+  inn: { fur: 0, coins: 0 },
+  bosses: {},                // 倒したぬし
   cleared: {},
   bossDead: false,
   time: 0,
@@ -24,7 +27,7 @@ export const S = {
 export function resetState() {
   const fresh = {
     ch: 1, coins: 0, earned: 0, up: { bag: 0, speed: 0, hp: 0 }, tool: { sword: 0, axe: 0, pick: 0 }, hired: [], lands: ['home'],
-    mission: 0, mp: 0, unlocked: {}, stations: {}, shop: { stock: { plank: 0, block: 0, jelly: 0 }, coins: 0 }, storage: {}, cleared: {}, bossDead: false,
+    mission: 0, mp: 0, unlocked: {}, stations: {}, shop: { stock: { plank: 0, block: 0, jelly: 0 }, coins: 0 }, storage: {}, market: { stock: {}, coins: 0 }, inn: { fur: 0, coins: 0 }, bosses: {}, cleared: {}, bossDead: false,
     time: 0, lastSeen: 0, stats: { sold: 0, kills: 0 },
   };
   for (const k in S) delete S[k];
@@ -39,6 +42,8 @@ export function loadState(d) {
     else S[k] = d[k];
   }
   S.shop.stock = { plank: 0, block: 0, jelly: 0, ...(d.shop && d.shop.stock) };
+  S.market.stock = { ...(d.market && d.market.stock) };
+  if (S.bossDead) S.bosses.bigslime = true;   // 区切り2のセーブ
 }
 
 export const stat = {
@@ -46,8 +51,8 @@ export const stat = {
   speed: () => UPGRADES.speed.values[S.up.speed],
   maxHp: () => UPGRADES.hp.values[S.up.hp],
   dmg: () => TOOLS.sword.values[S.tool.sword],
-  power: tool => TOOLS[tool].values[S.tool[tool]],
-  swing: tool => TOOLS[tool].swing[S.tool[tool]],
+  power: tool => TOOLS[tool] ? TOOLS[tool].values[S.tool[tool]] : 1,
+  swing: tool => TOOLS[tool] ? TOOLS[tool].swing[S.tool[tool]] : 0.35,
 };
 
 export function rankScore(pop, buildings) {

@@ -206,7 +206,7 @@ function storage() {
   return g;
 }
 
-export const BUILDINGS = { house, sawmill, stonework, shop, smithy, storage };
+
 
 // ---- 焚き火 ----
 export function campfire() {
@@ -346,7 +346,7 @@ export function itemGeo(kind) {
   if (kind === 'jelly') return new THREE.IcosahedronGeometry(0.15, 1).scale(1.12, 0.82, 1.12);
   if (kind === 'plank') return new THREE.BoxGeometry(0.56, 0.11, 0.24);
   if (kind === 'block') return new THREE.BoxGeometry(0.3, 0.26, 0.3);
-  return new THREE.BoxGeometry(0.25, 0.25, 0.25);
+  return itemGeo2(kind) || new THREE.BoxGeometry(0.25, 0.25, 0.25);
 }
 export const coinGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.05, 10);
 
@@ -430,3 +430,175 @@ export function bossParts() {
   ]), color: 0xffd34d });
   return parts;
 }
+
+// ---- 第2章の建物 ----
+function mine() {
+  const g = new THREE.Group();
+  box(g, 4.0, 0.24, 3.0, C.stoneD, 0, 0.12, 0);
+  // 岩山と入口
+  rockM(g, 1.3, 0x8f8a84, -0.9, 0.9, -0.5, 0.4);
+  rockM(g, 1.1, 0x9c978f, 1.0, 0.8, -0.6, 1.2);
+  rockM(g, 0.9, 0x86817b, 0, 1.6, -0.9, 2.1);
+  box(g, 1.5, 1.5, 0.3, 0x2e2622, 0, 0.9, 0.55);
+  box(g, 0.2, 1.7, 0.24, C.woodD, -0.8, 0.97, 0.7);
+  box(g, 0.2, 1.7, 0.24, C.woodD, 0.8, 0.97, 0.7);
+  box(g, 1.9, 0.22, 0.28, C.woodD, 0, 1.86, 0.7);
+  box(g, 1.3, 0.34, 0.1, C.woodL, 0, 2.2, 0.78);
+  // レールとトロッコ
+  for (const x of [-0.3, 0.3]) box(g, 0.06, 0.05, 1.6, 0x6b6f78, x, 0.27, 1.4);
+  for (let i = 0; i < 4; i++) box(g, 0.9, 0.05, 0.12, C.wood, 0, 0.25, 0.8 + i * 0.4);
+  box(g, 0.8, 0.45, 0.6, 0x6b6f78, 0, 0.55, 1.6);
+  for (const [x, z] of [[-0.25, 1.45], [0.2, 1.7], [0, 1.55]]) rockM(g, 0.14, 0x7d6e66, x, 0.82, z, x * 9);
+  box(g, 0.14, 0.14, 0.14, 0xe0823c, 0.12, 0.88, 1.5);
+  // ランタン
+  lit(g, 0.14, 0.2, 0.14, 0xffd36a, 0.95, 1.55, 0.95);
+  return g;
+}
+
+function pharmacy() {
+  const g = new THREE.Group();
+  box(g, 3.2, 0.22, 2.8, C.stone, 0, 0.11, 0);
+  box(g, 2.8, 1.6, 2.2, 0xf4efe2, 0, 1.02, -0.1);
+  for (const [x, z] of [[-1.4, 1.0], [1.4, 1.0], [-1.4, -1.2], [1.4, -1.2]]) box(g, 0.18, 1.62, 0.18, 0x6b8f5a, x, 1.03, z);
+  roof(g, 3.3, 1.05, 2.9, 0x5fa86a, 0, 1.82, -0.1);
+  box(g, 0.7, 1.05, 0.08, 0x6b8f5a, -0.7, 0.75, 1.02);
+  box(g, 1.0, 0.7, 0.08, C.glass, 0.6, 1.1, 1.02);
+  // 棚の薬びん
+  for (let i = 0; i < 4; i++) {
+    cyl(g, 0.08, 0.2, [0xe86a8a, 0x6fc3e8, 0xf5c542, 0x9b6fd6][i], 0.25 + i * 0.22, 0.94, 1.04, 0, 0, 0, 6);
+  }
+  // 看板（緑の十字）
+  box(g, 0.7, 0.7, 0.08, 0xffffff, 0, 2.35, 1.0);
+  box(g, 0.5, 0.14, 0.1, 0x4fae45, 0, 2.35, 1.03);
+  box(g, 0.14, 0.5, 0.1, 0x4fae45, 0, 2.35, 1.03);
+  // 薬草の鉢
+  for (const x of [-1.25, 1.25]) { cyl(g, 0.22, 0.3, 0xb86a3a, x, 0.37, 1.35, 0, 0, 0, 7); add(g, new THREE.IcosahedronGeometry(0.25, 0), 0, x, 0.65, 1.35, 1, 1, 1, 0, 0, 0, mat(0x5fbf4f)); }
+  return g;
+}
+
+function inn() {
+  const g = new THREE.Group();
+  box(g, 3.6, 0.24, 3.0, C.stone, 0, 0.12, 0);
+  box(g, 3.2, 1.4, 2.6, 0xf0dcb8, 0, 0.94, 0);
+  box(g, 3.4, 0.16, 2.8, C.woodD, 0, 1.7, 0);
+  box(g, 3.2, 1.2, 2.6, 0xe9c9a0, 0, 2.36, 0);
+  for (const [x, z] of [[-1.6, 1.3], [1.6, 1.3], [-1.6, -1.3], [1.6, -1.3]]) box(g, 0.2, 2.8, 0.2, C.woodD, x, 1.54, z);
+  roof(g, 3.7, 1.3, 3.2, 0x4f7fc9, 0, 2.96, 0);
+  box(g, 0.9, 1.15, 0.08, 0x8a5a35, 0, 0.82, 1.31);
+  for (const x of [-1.0, 1.0]) { box(g, 0.55, 0.5, 0.08, C.glass, x, 1.05, 1.31); box(g, 0.55, 0.5, 0.08, C.glass, x, 2.4, 1.31); }
+  box(g, 0.55, 0.5, 0.08, C.glass, 0, 2.4, 1.31);
+  // 看板（ベッド）
+  box(g, 0.08, 0.08, 0.7, C.woodD, 1.3, 2.0, 1.65);
+  box(g, 0.7, 0.5, 0.08, C.woodL, 1.3, 1.7, 2.0);
+  box(g, 0.44, 0.1, 0.1, 0x4f7fc9, 1.3, 1.62, 2.05);
+  box(g, 0.14, 0.12, 0.1, 0xffffff, 1.14, 1.72, 2.05);
+  lit(g, 0.16, 0.22, 0.16, 0xffd36a, -0.7, 1.45, 1.4);
+  return g;
+}
+
+function market() {
+  const g = new THREE.Group();
+  box(g, 5.0, 0.2, 2.6, C.woodL, 0, 0.1, 0);
+  const awn = [[0xf05a4a, 0xfff6ea], [0x4f9ad9, 0xfff6ea], [0xf5c542, 0xfff6ea]];
+  for (let s = 0; s < 3; s++) {
+    const cx = -1.6 + s * 1.6;
+    box(g, 1.45, 0.75, 0.6, C.wood, cx, 0.57, 0.8);
+    box(g, 1.55, 0.1, 0.72, C.woodL, cx, 0.98, 0.8);
+    box(g, 1.45, 1.3, 0.35, C.woodD, cx, 0.85, -0.95);
+    for (const x of [cx - 0.72, cx + 0.72]) box(g, 0.12, 2.1, 0.12, C.woodD, x, 1.15, 1.05);
+    for (let i = 0; i < 4; i++) box(g, 0.38, 0.07, 2.3, awn[s][i % 2], cx - 0.57 + i * 0.38, 2.18, 0.1, -0.22, 0, 0);
+  }
+  box(g, 1.8, 0.5, 0.1, C.woodD, 0, 2.75, -1.0);
+  cyl(g, 0.17, 0.06, C.gold, -0.4, 2.75, -0.93, Math.PI / 2, 0, 0, 10);
+  cyl(g, 0.17, 0.06, C.gold, 0.4, 2.75, -0.93, Math.PI / 2, 0, 0, 10);
+  // 旗
+  for (const x of [-2.4, 2.4]) { box(g, 0.08, 3.0, 0.08, C.woodD, x, 1.5, -1.1); box(g, 0.5, 0.35, 0.04, x < 0 ? 0xf05a4a : 0x4f9ad9, x + 0.28, 2.75, -1.1); }
+  return g;
+}
+
+// 街灯（第2章から町に立つ）
+export function lampModel() {
+  const g = new THREE.Group();
+  cyl(g, 0.07, 2.2, 0x3c3f46, 0, 1.1, 0, 0, 0, 0, 6);
+  box(g, 0.3, 0.08, 0.3, 0x3c3f46, 0, 2.22, 0);
+  lit(g, 0.22, 0.28, 0.22, 0xffe7a0, 0, 2.4, 0);
+  box(g, 0.34, 0.06, 0.34, 0x3c3f46, 0, 2.57, 0);
+  box(g, 0.3, 0.08, 0.3, 0x3c3f46, 0, 0.04, 0);
+  return g;
+}
+
+// ---- 第2章の素材・資源 ----
+function faceColors(geo, pick) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const n = g.attributes.position.count, col = new Float32Array(n * 3), c = new THREE.Color();
+  for (let f = 0; f < n / 3; f++) { c.setHex(pick(f)); for (let v = 0; v < 3; v++) c.toArray(col, (f * 3 + v) * 3); }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return g;
+}
+export function oreGeo(r = 0.16) {
+  return faceColors(new THREE.DodecahedronGeometry(r, 0).scale(1.05, 0.85, 0.95), f => [3, 7, 10].includes(f % 12) ? 0xe0823c : (f % 2 ? 0x6e625c : 0x7d7069));
+}
+export const ironRockGeo = faceColors(new THREE.DodecahedronGeometry(0.72, 0).scale(1, 0.75, 0.9).translate(0, 0.38, 0), f => [2, 5, 9, 14, 20, 27, 31].includes(f) ? 0xe0823c : (f % 3 ? 0x77706b : 0x868079));
+export const herbGeo = (() => {
+  const parts = [];
+  for (const [x, z, r, y] of [[0, 0, 0.32, 0.3], [0.28, 0.12, 0.24, 0.24], [-0.25, 0.1, 0.25, 0.24], [0.05, -0.25, 0.22, 0.22]]) parts.push(faceColors(new THREE.IcosahedronGeometry(r, 0).translate(x, y, z), () => 0x4fae45));
+  for (const [x, z] of [[0.1, 0.2], [-0.2, -0.1], [0.3, -0.1]]) parts.push(faceColors(new THREE.IcosahedronGeometry(0.07, 0).translate(x, 0.52, z), () => 0xff8fd0));
+  return mergeGeos(parts);
+})();
+function itemGeo2(kind) {
+  if (kind === 'ore') return oreGeo();
+  if (kind === 'fur') return faceColors(new THREE.BoxGeometry(0.46, 0.12, 0.32), f => (f % 4 < 2 ? 0xc9a27a : 0xe0c29c));
+  if (kind === 'herb') return mergeGeos([
+    faceColors(new THREE.ConeGeometry(0.07, 0.3, 5).translate(-0.06, 0, 0).rotateZ(0.3), () => 0x4fae45),
+    faceColors(new THREE.ConeGeometry(0.07, 0.3, 5).translate(0.06, 0, 0).rotateZ(-0.3), () => 0x5fbf4f),
+    faceColors(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 6).translate(0, -0.12, 0), () => 0xc98a4b),
+    faceColors(new THREE.IcosahedronGeometry(0.05, 0).translate(0, 0.14, 0), () => 0xff8fd0),
+  ]);
+  if (kind === 'medicine') return mergeGeos([
+    faceColors(new THREE.CylinderGeometry(0.12, 0.13, 0.2, 8).translate(0, -0.04, 0), () => 0xe8506a),
+    faceColors(new THREE.CylinderGeometry(0.05, 0.08, 0.08, 8).translate(0, 0.1, 0), () => 0xf4f4f4),
+    faceColors(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 6).translate(0, 0.16, 0), () => 0xa8713e),
+  ]);
+  return null;
+}
+
+// ---- 第2章の敵 ----
+export function wolfParts() {
+  const B = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  const leg = (x, z) => ({ geo: B(0.13, 0.36, 0.14, x, 0.18, z), tint: true, pivot: [x, 0.36, z] });
+  return [
+    leg(-0.14, 0.32), leg(0.14, 0.32), leg(-0.14, -0.32), leg(0.14, -0.32),
+    { geo: B(0.42, 0.4, 0.95, 0, 0.56, 0), tint: true },
+    { geo: mergeGeos([B(0.38, 0.34, 0.38, 0, 0.82, 0.56), B(0.12, 0.16, 0.08, -0.12, 1.04, 0.5), B(0.12, 0.16, 0.08, 0.12, 1.04, 0.5), B(0.12, 0.12, 0.45, 0, 0.72, -0.62).rotateX(0)]), tint: true },
+    { geo: B(0.2, 0.16, 0.24, 0, 0.74, 0.84), color: 0xd9d4cc },
+    { geo: mergeGeos([B(0.07, 0.07, 0.02, -0.1, 0.9, 0.755), B(0.07, 0.07, 0.02, 0.1, 0.9, 0.755), B(0.08, 0.06, 0.04, 0, 0.8, 0.97)]), color: 0x1e1a1a },
+  ];
+}
+function goblinBase(club, extra) {
+  const B = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  return [
+    { geo: B(0.15, 0.28, 0.17, -0.11, 0.14, 0), color: 0x5a4632, pivot: [-0.11, 0.28, 0] },
+    { geo: B(0.15, 0.28, 0.17, 0.11, 0.14, 0), color: 0x5a4632, pivot: [0.11, 0.28, 0] },
+    { geo: B(0.44, 0.4, 0.3, 0, 0.47, 0), color: 0x8a6a3a },
+    { geo: mergeGeos([B(0.46, 0.4, 0.42, 0, 0.88, 0), new THREE.ConeGeometry(0.08, 0.34, 4).rotateZ(Math.PI / 2).translate(-0.36, 0.95, 0), new THREE.ConeGeometry(0.08, 0.34, 4).rotateZ(-Math.PI / 2).translate(0.36, 0.95, 0), B(0.1, 0.12, 0.1, 0, 0.84, 0.24)]), tint: true },
+    { geo: mergeGeos([B(0.09, 0.07, 0.02, -0.1, 0.94, 0.215), B(0.09, 0.07, 0.02, 0.1, 0.94, 0.215)]), color: 0xffd23a },
+    { geo: B(0.12, 0.32, 0.14, -0.29, 0.5, 0), tint: true, pivot: [-0.29, 0.66, 0] },
+    { geo: mergeGeos([B(0.12, 0.32, 0.14, 0.29, 0.5, 0), club]), tint: true, pivot: [0.29, 0.66, 0] },
+    ...extra,
+  ];
+}
+export function goblinParts() {
+  const club = new THREE.CylinderGeometry(0.09, 0.05, 0.6, 6).rotateX(Math.PI / 2).translate(0.29, 0.36, 0.3);
+  return goblinBase(club, []);
+}
+export function chiefParts() {
+  const club = mergeGeos([new THREE.CylinderGeometry(0.13, 0.06, 0.8, 6).rotateX(Math.PI / 2).translate(0.29, 0.34, 0.4), new THREE.DodecahedronGeometry(0.16, 0).translate(0.29, 0.34, 0.78)]);
+  const helm = mergeGeos([
+    new THREE.CylinderGeometry(0.27, 0.27, 0.16, 8).translate(0, 1.14, 0),
+    new THREE.ConeGeometry(0.06, 0.28, 5).rotateZ(0.6).translate(-0.26, 1.3, 0),
+    new THREE.ConeGeometry(0.06, 0.28, 5).rotateZ(-0.6).translate(0.26, 1.3, 0),
+  ]);
+  return goblinBase(club, [{ geo: helm, color: 0xb0a48a }, { geo: new THREE.BoxGeometry(0.5, 0.12, 0.34).translate(0, 0.72, 0), color: 0xc9a27a }]);
+}
+
+export const BUILDINGS = { house, sawmill, stonework, shop, smithy, storage, mine, pharmacy, inn, market };

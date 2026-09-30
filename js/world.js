@@ -1,7 +1,8 @@
 // 地面・土地と柵・焚き火・草花と、ぶつかり判定
 import * as THREE from './lib/three.module.min.js';
 import { scene, mat } from './gfx.js';
-import { campfire } from './models.js';
+import { campfire, lampModel } from './models.js';
+import { bake } from './gfx.js';
 
 export function rand(seed) {
   return () => {
@@ -19,6 +20,7 @@ const EDGE = 0.45;
 // 廃村のくすんだ色 → 発展した鮮やかな色
 const DULL = [new THREE.Color(0xc2c585), new THREE.Color(0xb0b777)];
 const LUSH = [new THREE.Color(0x93d36b), new THREE.Color(0x7fc45e)];
+const VIVID = [new THREE.Color(0x86d95e), new THREE.Color(0x6fcb4f)];
 const WILD = new THREE.Color(0x8fae6a), OUTER = new THREE.Color(0x76b85a), DIRT = new THREE.Color(0xe2c38f);
 
 export class World {
@@ -33,6 +35,7 @@ export class World {
     this.circles = [];
     this.boxes = [];
     this.lush = 0;
+    this.chapter = ch.n || 1;
     this.fireBoost = 0;
     this.makeGround();
     const cf = campfire();
@@ -76,7 +79,9 @@ export class World {
   paintGround() {
     const g = this.ground.geometry, pos = g.attributes.position, col = g.attributes.color;
     const [fx, fz] = this.ch.campfire, a = new THREE.Color(), bb = new THREE.Color(), c = new THREE.Color();
-    a.copy(DULL[0]).lerp(LUSH[0], this.lush); bb.copy(DULL[1]).lerp(LUSH[1], this.lush);
+    // 第1章：くすんだ色→鮮やか、第2章から：鮮やか→もっと鮮やか
+    const from = this.chapter >= 2 ? LUSH : DULL, to = this.chapter >= 2 ? VIVID : LUSH;
+    a.copy(from[0]).lerp(to[0], this.lush); bb.copy(from[1]).lerp(to[1], this.lush);
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i), h = pos.getY(i);
       c.copy(a).lerp(bb, noise2(x, z) * 0.5 + 0.5);
@@ -206,6 +211,33 @@ export class World {
     for (const im of [gm, fm]) { im.computeBoundingSphere(); scene.add(im); }
     this.flowers = fm; this.flowerMax = flowers.length;
     this.paintGround();
+  }
+
+  // 町の飾り：石だたみの道と街灯（第2章から）
+  addTown(towns) {
+    const tiles = [], lamps = [];
+    for (const town of towns) {
+      for (const [x0, z0, x1, z1] of town.roads) {
+        const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(len / 0.75));
+        for (let i = 0; i <= n; i++) {
+          const k = i / n, x = x0 + (x1 - x0) * k, z = z0 + (z1 - z0) * k;
+          for (const o of [-0.45, 0.45]) {
+            const ox = -(z1 - z0) / len * o, oz = (x1 - x0) / len * o;
+            tiles.push([x + ox + (Math.random() - 0.5) * 0.1, z + oz + (Math.random() - 0.5) * 0.1, Math.random()]);
+          }
+        }
+      }
+      lamps.push(...town.lamps);
+    }
+    if (!tiles.length) return;
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), c = new THREE.Color();
+    const road = new THREE.InstancedMesh(new THREE.BoxGeometry(0.7, 0.05, 0.62), mat(0xffffff), tiles.length);
+    tiles.forEach(([x, z, r], i) => {
+      road.setMatrixAt(i, m.compose(p.set(x, 0.025, z), q.setFromAxisAngle(up, (r - 0.5) * 0.3), s.set(1, 1, 1)));
+      road.setColorAt(i, c.setHex([0xd9cfbd, 0xcfc4b0, 0xe3dac8][(r * 3) | 0]));
+    });
+    road.receiveShadow = true; road.computeBoundingSphere(); scene.add(road);
+    for (const [x, z] of lamps) { const g = bake(lampModel()); g.position.set(x, 0, z); scene.add(g); this.circles.push({ x, z, r: 0.15 }); }
   }
 
   update(t, dt = 0) {

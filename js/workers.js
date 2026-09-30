@@ -57,7 +57,7 @@ export class Workers {
     for (const w of this.list) {
       w.moving = 0;
       const job = w.job;
-      if (job === 'lumber' || job === 'miner') this.gatherer(w, dt, player, hooks, job === 'lumber' ? 'tree' : 'rock', job === 'lumber' ? 'sawmill' : 'stonework');
+      if (job && JOBS[job].node) this.gatherer(w, dt, player, hooks, JOBS[job].node, JOBS[job].to);
       else if (job === 'carrier') this.carrier(w, dt, player, hooks);
       else if (job === 'keeper') this.keeperJob(w, dt);
       else this.idle(w, dt);
@@ -104,31 +104,41 @@ export class Workers {
       for (let i = 0; i < got; i++) this.items.give(w, drop, n.x, 0.9, n.z);
       const close = Math.hypot(player.pos.x - w.x, player.pos.z - w.z) < 9;
       if (type === 'tree') { burst(n.x, 1.8 * n.scl, n.z, { n: 3, colors: [0x6cc24a, 0x8ed86a], speed: 1.4, up: 1, size: 0.12, life: 0.7, g: 3, spread: 1 }); if (close) sfx.chopSoft(); }
+      else if (type === 'herb') burst(n.x, 0.5, n.z, { n: 4, colors: [0x5fbf4f, 0xff8fd0], speed: 1.5, up: 2, size: 0.08, life: 0.5 });
       else { burst(n.x, 0.6, n.z, { n: 3, colors: [0x9ea3aa, 0xc4c8ce], speed: 2.5, up: 3, size: 0.1, life: 0.5 }); if (close) sfx.rockSoft(); }
       if (n.state !== 'ok') w.target = null;
     }
   }
 
-  // 運び手：加工場の出口からお店のカウンターへ
+  // 運び手：加工場・鉱山の出口から、それを売っているお店・市場のカウンターへ
   carrier(w, dt, player, hooks) {
-    const shop = this.stations.shop;
-    if (!shop || !shop.site.done) return this.idle(w, dt);
+    const open = this.stations.shops.filter(sh => sh.site.done);
+    if (!open.length) return this.idle(w, dt);
+    const sold = k => open.some(sh => sh.sells.includes(k));
     if (w.state === 'stock' || (w.bag.length > 0 && w.state !== 'load')) {
       w.state = 'stock';
-      if (this.goTo(w, shop.stock.x, shop.stock.z, dt, 0.6)) {
+      // 背中の物を売っていて、すいているお店へ
+      if (!w.dest || !w.dest.site.done || !w.bag.some(it => w.dest.sells.includes(it.kind))) {
+        const cands = open.filter(sh => w.bag.some(it => sh.sells.includes(it.kind)));
+        cands.sort((a, b) => this.stations.stockTotal(a) / a.cap - this.stations.stockTotal(b) / b.cap);
+        w.dest = cands[0] || null;
+      }
+      const sh = w.dest;
+      if (!sh) { w.state = 'idle'; return; }
+      if (this.goTo(w, sh.stock.x, sh.stock.z, dt, 0.6)) {
         w.actT -= dt;
         if (w.actT <= 0) {
           w.actT = 0.1;
-          if (!this.stations.stockOne(w, player, hooks) && !w.bag.length) w.state = 'idle';
+          if (!this.stations.stockOne(sh, w, player, hooks)) { w.dest = null; if (!w.bag.length) w.state = 'idle'; }
         }
       }
       return;
     }
     if (w.state !== 'load' || !w.src || this.stations.st(w.src).out <= 0) {
       let best = null, most = 0;
-      for (const p of this.stations.proc) { if (!p.site.done) continue; const o = this.stations.st(p).out; if (o > most) { most = o; best = p; } }
+      for (const p of this.stations.proc) { if (!p.site.done || !sold(p.to)) continue; const o = this.stations.st(p).out; if (o > most) { most = o; best = p; } }
       w.src = best; w.state = best ? 'load' : 'idle';
-      if (!best) { if (w.bag.length) w.state = 'stock'; else this.goTo(w, shop.stock.x - 1.2, shop.stock.z + 1.2, dt, 0.4); return; }
+      if (!best) { if (w.bag.length) w.state = 'stock'; else this.goTo(w, open[0].stock.x - 1.2, open[0].stock.z + 1.2, dt, 0.4); return; }
     }
     if (this.goTo(w, w.src.outPos.x, w.src.outPos.z, dt, 0.9)) {
       w.actT -= dt;

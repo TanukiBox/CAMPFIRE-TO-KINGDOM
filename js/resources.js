@@ -1,7 +1,7 @@
 // 木と岩：切る・割る・倒れる・一定時間で元に戻る。同じ形はまとめて描く
 import * as THREE from './lib/three.module.min.js';
 import { scene, mat, Blobs, quality } from './gfx.js';
-import { treeGeos, rockGeo } from './models.js';
+import { treeGeos, rockGeo, ironRockGeo, herbGeo } from './models.js';
 import { NODE_TYPES } from './data.js';
 import { rand } from './world.js';
 
@@ -31,9 +31,13 @@ export class Resources {
       if (z > f.z1 && z < f.z1 + 18) continue; // 手前（画面の下）はカメラをふさぐので置かない
       decor.push({ type: r() < 0.12 ? 'rock' : 'tree', x, z, y: world.heightAt(x, z), rot: r() * Math.PI * 2, scl: 0.9 + r() * 0.5, pine: r() < 0.5 });
     }
-    const trees = this.nodes.filter(n => n.type === 'tree'), rocks = this.nodes.filter(n => n.type === 'rock');
+    const trees = this.nodes.filter(n => n.type === 'tree');
     const dTrees = decor.filter(d => d.type === 'tree'), dRocks = decor.filter(d => d.type === 'rock');
-    const nt = trees.length + dTrees.length, nr = rocks.length + dRocks.length;
+    const nt = trees.length + dTrees.length;
+    // 岩・鉄の岩・薬草は種類ごとに1つの形でまとめて描く
+    const SOLID = { rock: rockGeo, ironrock: ironRockGeo, herb: herbGeo };
+    const solidNodes = {};
+    for (const k in SOLID) solidNodes[k] = this.nodes.filter(n => n.type === k);
 
     const mk = (geo, color, n) => {
       const m = new THREE.InstancedMesh(geo, mat(color), n);
@@ -44,22 +48,30 @@ export class Resources {
     this.round = mk(treeGeos.round, 0xffffff, nt);
     this.pineM = mk(treeGeos.pine, 0xffffff, nt);
     this.stump = mk(treeGeos.stump, 0xb98556, Math.max(1, trees.length));
-    this.rock = mk(rockGeo, 0xffffff, nr);
-    this.shadows = new Blobs(nt + nr);
+    this.solid = {};
+    for (const k in SOLID) {
+      const n = solidNodes[k].length + (k === 'rock' ? dRocks.length : 0);
+      const m = new THREE.InstancedMesh(SOLID[k], SOLID[k].attributes.color ? mat(0xffffff, { vertexColors: true }) : mat(0xffffff), Math.max(1, n));
+      m.castShadow = k !== 'herb'; scene.add(m);
+      this.solid[k] = m;
+      solidNodes[k].forEach((nd, i) => { nd.slot = i; });
+    }
+    this.rock = this.solid.rock;
+    this.meshes = [this.trunk, this.round, this.pineM, this.stump, ...Object.values(this.solid)];
+    this.shadows = new Blobs(nt + this.nodes.length + dRocks.length);
 
     trees.forEach((n, i) => { n.slot = i; n.stumpSlot = i; });
-    rocks.forEach((n, i) => { n.slot = i; });
-    let ti = trees.length, ri = rocks.length;
+    let ti = trees.length, ri = solidNodes.rock.length;
     for (const d of dTrees) { d.slot = ti++; this.placeTree(d, 1, 0); }
     for (const d of dRocks) { d.slot = ri++; this.placeRock(d, 1, 0); }
     this.decor = decor;
     for (const n of this.nodes) {
       if (n.type === 'tree') { this.placeTree(n, 1, 0); this.stump.setMatrixAt(n.stumpSlot, ZERO); }
       else this.placeRock(n, 1, 0);
-      world.circles.push({ x: n.x, z: n.z, r: n.def.collide, off: () => n.type === 'rock' && n.state === 'gone' });
+      if (n.def.collide > 0) world.circles.push({ x: n.x, z: n.z, r: n.def.collide, off: () => n.type !== 'tree' && n.state === 'gone' });
     }
     this.colorAll();
-    for (const m of [this.trunk, this.round, this.pineM, this.stump, this.rock]) { m.computeBoundingSphere(); m.frustumCulled = false; }
+    for (const m of this.meshes) { m.computeBoundingSphere(); m.frustumCulled = false; }
     this.flush();
     this.shadowsDirty = true;
   }
@@ -73,8 +85,10 @@ export class Resources {
         _c.setHex(pal[k % pal.length]);
         (n.pine ? this.pineM : this.round).setColorAt(n.slot, _c);
         (n.pine ? this.round : this.pineM).setColorAt(n.slot, _c);
-      } else {
+      } else if (n.type === 'rock') {
         this.rock.setColorAt(n.slot, _c.setHex(ROCK[k % ROCK.length]));
+      } else {
+        this.solid[n.type].setColorAt(n.slot, _c.setScalar(0.88 + (k % 7) * 0.02));
       }
     }
   }
@@ -93,11 +107,13 @@ export class Resources {
     _q.setFromAxisAngle(UP, n.rot + wob * 0.2);
     const sc = n.scl * s;
     _m.compose(_p.set(n.x + wob * 0.06 * n.dx, n.y || 0, n.z + wob * 0.06 * n.dz), _q, _s.set(sc * (1 + wob * 0.1), sc * (1 - wob * 0.12), sc * (1 + wob * 0.1)));
-    this.rock.setMatrixAt(n.slot, s > 0 ? _m : ZERO);
+    this.solid[n.type].setMatrixAt(n.slot, s > 0 ? _m : ZERO);
   }
   flush() {
-    for (const m of [this.trunk, this.round, this.pineM, this.stump, this.rock]) m.instanceMatrix.needsUpdate = true;
-    for (const m of [this.round, this.pineM, this.rock]) if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    for (const m of this.meshes) {
+      m.instanceMatrix.needsUpdate = true;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
   }
 
   // 手の届く一番近い資源（買った土地のものだけ）
@@ -193,7 +209,7 @@ export class Resources {
     b.begin();
     for (const n of this.nodes) {
       if (n.type === 'tree') b.push(n.x, n.z, n.state === 'gone' ? 0.35 : 1.0 * n.scl);
-      else if (n.state !== 'gone') b.push(n.x, n.z, 0.8 * n.scl);
+      else if (n.state !== 'gone') b.push(n.x, n.z, (n.type === 'herb' ? 0.45 : 0.8) * n.scl);
     }
     for (const d of this.decor) b.push(d.x, d.z, (d.type === 'tree' ? 1.0 : 0.8) * d.scl, d.y + 0.03);
     b.end();

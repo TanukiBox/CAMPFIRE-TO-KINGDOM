@@ -97,15 +97,15 @@ export const ui = {
   },
 
   r_clear(d) {
-    return `<div class="clear-burst">🎉</div><h2 class="big">${t('clearTitle')}</h2><p class="sub">${t('clearSub')}</p>
+    return `<div class="clear-burst">🎉</div><h2 class="big">${t('clearTitle_' + d.n)}</h2><p class="sub">${t('clearSub_' + d.n)}</p>
       <div class="stats">
         <div><small>${t('statRank')}</small><b>${iconImg('crown')}${d.rank}</b></div>
         <div><small>${t('statPop')}</small><b>${iconImg('people')}${d.pop}</b></div>
         <div><small>${t('statTime')}</small><b>${fmtTime(d.time)}</b></div>
       </div>
       <a class="share-x" href="${d.shareUrl}" target="_blank" rel="noopener">𝕏 ${t('share')}</a>
-      <p class="sub small">${t('nextSoon')}</p>
-      <button class="close" data-act="keep">${t('keepPlaying')}</button>`;
+      ${d.next ? '' : `<p class="sub small">${t('nextSoon_' + d.n)}</p>`}
+      <button class="close" data-act="keep">${d.next ? t('toChapter', { n: d.n + 1 }) : t('keepPlaying')}</button>`;
   },
 
   r_away(d) {
@@ -116,7 +116,7 @@ export const ui = {
   },
 
   // ---- タイトル ----
-  showTitle(hasSave, debug, onStart) {
+  showTitle(hasSave, debug, onStart, last = 1) {
     this.open = 'title';
     const el = $('title');
     el.hidden = false;
@@ -127,7 +127,7 @@ export const ui = {
     const box = $('debugBox');
     box.hidden = !debug;
     if (debug) {
-      box.innerHTML = `<p>${t('debugTitle')}</p><div class="seg">` + [1, 2, 3, 4].map(n => `<button type="button" data-ch="${n}" ${n > 1 ? 'disabled' : ''}>${t('chN', { n })}</button>`).join('') + '</div>';
+      box.innerHTML = `<p>${t('debugTitle')}</p><div class="seg">` + [1, 2, 3, 4].map(n => `<button type="button" data-ch="${n}" ${n > last ? 'disabled' : ''}>${t('chN', { n })}</button>`).join('') + '</div>';
       box.querySelectorAll('button[data-ch]').forEach(b => b.onclick = () => { el.hidden = true; this.open = null; onStart(+b.dataset.ch); });
     }
   },
