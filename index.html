@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20260930132948">
+<link rel="stylesheet" href="css/style.css?v=20260930135115">
 </head>
 <body>
 <div id="app">
@@ -43,6 +43,19 @@
   <div id="joy" hidden><div id="joyKnob"></div></div>
   <div id="fade"></div>
   <div id="fps" class="fps" hidden></div>
+
+  <div id="coronation" class="coronation" hidden><div class="cor-crown">👑</div><h1 id="corTitle"></h1><p id="corSub"></p></div>
+  <div id="credits" class="credits modal" hidden><div id="creditsRoll" class="credits-roll"></div><button type="button" id="btnSkip" class="skip-btn"></button></div>
+  <div id="endcard" class="modal endcard" hidden>
+    <div class="sheet end-sheet">
+      <div class="clear-burst">👑</div>
+      <h2 class="big" id="endTitle"></h2>
+      <p class="sub" id="endSub"></p>
+      <div class="stats" id="endStats"></div>
+      <a id="endShare" class="share-x" target="_blank" rel="noopener"></a>
+      <button type="button" id="endKeep" class="close"></button>
+    </div>
+  </div>
 
   <div id="sheetModal" class="modal" hidden><div id="sheet" class="sheet"></div></div>
 
@@ -92,34 +105,34 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/audio.js": "./js/audio.js?v=20260930132948",
-    "./js/build.js": "./js/build.js?v=20260930132948",
-    "./js/coins.js": "./js/coins.js?v=20260930132948",
-    "./js/data.js": "./js/data.js?v=20260930132948",
-    "./js/enemies.js": "./js/enemies.js?v=20260930132948",
-    "./js/fx.js": "./js/fx.js?v=20260930132948",
-    "./js/gfx.js": "./js/gfx.js?v=20260930132948",
-    "./js/hud.js": "./js/hud.js?v=20260930132948",
-    "./js/i18n.js": "./js/i18n.js?v=20260930132948",
-    "./js/icons.js": "./js/icons.js?v=20260930132948",
-    "./js/input.js": "./js/input.js?v=20260930132948",
-    "./js/items.js": "./js/items.js?v=20260930132948",
-    "./js/lib/three.module.min.js": "./js/lib/three.module.min.js?v=20260930132948",
-    "./js/main.js": "./js/main.js?v=20260930132948",
-    "./js/missions.js": "./js/missions.js?v=20260930132948",
-    "./js/models.js": "./js/models.js?v=20260930132948",
-    "./js/player.js": "./js/player.js?v=20260930132948",
-    "./js/resources.js": "./js/resources.js?v=20260930132948",
-    "./js/rig.js": "./js/rig.js?v=20260930132948",
-    "./js/save.js": "./js/save.js?v=20260930132948",
-    "./js/state.js": "./js/state.js?v=20260930132948",
-    "./js/stations.js": "./js/stations.js?v=20260930132948",
-    "./js/ui.js": "./js/ui.js?v=20260930132948",
-    "./js/workers.js": "./js/workers.js?v=20260930132948",
-    "./js/world.js": "./js/world.js?v=20260930132948"
+    "./js/audio.js": "./js/audio.js?v=20260930135115",
+    "./js/build.js": "./js/build.js?v=20260930135115",
+    "./js/coins.js": "./js/coins.js?v=20260930135115",
+    "./js/data.js": "./js/data.js?v=20260930135115",
+    "./js/enemies.js": "./js/enemies.js?v=20260930135115",
+    "./js/fx.js": "./js/fx.js?v=20260930135115",
+    "./js/gfx.js": "./js/gfx.js?v=20260930135115",
+    "./js/hud.js": "./js/hud.js?v=20260930135115",
+    "./js/i18n.js": "./js/i18n.js?v=20260930135115",
+    "./js/icons.js": "./js/icons.js?v=20260930135115",
+    "./js/input.js": "./js/input.js?v=20260930135115",
+    "./js/items.js": "./js/items.js?v=20260930135115",
+    "./js/lib/three.module.min.js": "./js/lib/three.module.min.js?v=20260930135115",
+    "./js/main.js": "./js/main.js?v=20260930135115",
+    "./js/missions.js": "./js/missions.js?v=20260930135115",
+    "./js/models.js": "./js/models.js?v=20260930135115",
+    "./js/player.js": "./js/player.js?v=20260930135115",
+    "./js/resources.js": "./js/resources.js?v=20260930135115",
+    "./js/rig.js": "./js/rig.js?v=20260930135115",
+    "./js/save.js": "./js/save.js?v=20260930135115",
+    "./js/state.js": "./js/state.js?v=20260930135115",
+    "./js/stations.js": "./js/stations.js?v=20260930135115",
+    "./js/ui.js": "./js/ui.js?v=20260930135115",
+    "./js/workers.js": "./js/workers.js?v=20260930135115",
+    "./js/world.js": "./js/world.js?v=20260930135115"
   }
 }
 </script>
-<script type="module" src="js/main.js?v=20260930132948"></script>
+<script type="module" src="js/main.js?v=20260930135115"></script>
 </body>
 </html>

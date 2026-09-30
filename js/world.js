@@ -23,6 +23,7 @@ const LUSH = [new THREE.Color(0x93d36b), new THREE.Color(0x7fc45e)];
 const VIVID = [new THREE.Color(0x86d95e), new THREE.Color(0x6fcb4f)];
 const SAND = new THREE.Color(0xf0dca8), WET = new THREE.Color(0xc9b27c);
 const BRIGHT = [new THREE.Color(0x7fde5a), new THREE.Color(0x62cf48)];
+const ROYALG = [new THREE.Color(0x9be060), new THREE.Color(0x7fd24f)];
 const WILD = new THREE.Color(0x8fae6a), OUTER = new THREE.Color(0x76b85a), DIRT = new THREE.Color(0xe2c38f);
 
 export class World {
@@ -86,7 +87,8 @@ export class World {
     const g = this.ground.geometry, pos = g.attributes.position, col = g.attributes.color;
     const [fx, fz] = this.ch.campfire, a = new THREE.Color(), bb = new THREE.Color(), c = new THREE.Color();
     // 第1章：くすんだ色→鮮やか、第2章から：鮮やか→もっと鮮やか
-    const from = this.chapter >= 3 ? VIVID : this.chapter >= 2 ? LUSH : DULL, to = this.chapter >= 3 ? BRIGHT : this.chapter >= 2 ? VIVID : LUSH;
+    const pal = [DULL, LUSH, VIVID, BRIGHT, ROYALG], c0 = Math.min(this.chapter, 4);
+    const from = pal[c0 - 1], to = pal[c0];
     a.copy(from[0]).lerp(to[0], this.lush); bb.copy(from[1]).lerp(to[1], this.lush);
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i), h = pos.getY(i);

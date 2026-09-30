@@ -15,17 +15,17 @@ export const STORAGE = { cap: 200 };
 
 // 強化（コインだけ）。values[レベル] が効果、costs[レベル] が次のレベルへの値段
 export const UPGRADES = {
-  bag:   { values: [10, 15, 20, 26, 32, 40, 50, 60, 75, 90], costs: [30, 70, 140, 240, 380, 600, 900, 1400, 2000] },   // 背中の積載量
-  speed: { values: [4.4, 4.8, 5.2, 5.6, 6.0, 6.4, 6.8, 7.2], costs: [40, 110, 220, 400, 650, 1000, 1500] },             // 移動速度
-  hp:    { values: [10, 14, 18, 24, 30, 38, 48, 60], costs: [40, 110, 230, 450, 750, 1100, 1600] },                     // HP
+  bag:   { values: [10, 15, 20, 26, 32, 40, 50, 60, 75, 90, 110, 130], costs: [30, 70, 140, 240, 380, 600, 900, 1400, 2000, 3000, 4500] },   // 背中の積載量
+  speed: { values: [4.4, 4.8, 5.2, 5.6, 6.0, 6.4, 6.8, 7.2, 7.6, 8.0], costs: [40, 110, 220, 400, 650, 1000, 1500, 2200, 3200] },             // 移動速度
+  hp:    { values: [10, 14, 18, 24, 30, 38, 48, 60, 75, 95], costs: [40, 110, 230, 450, 750, 1100, 1600, 2400, 3500] },                     // HP
 };
 
 // 鍛冶屋での強化（素材＋コイン）。素材は背中から使う
 export const TOOLS = {
-  sword: { values: [1, 2, 3, 5, 7, 10, 14, 20], swing: [0.42, 0.4, 0.38, 0.36, 0.34, 0.32, 0.3, 0.28],
-    costs: [{ block: 3, coin: 40 }, { block: 6, jelly: 4, coin: 100 }, { block: 10, jelly: 8, coin: 220 }, { block: 10, ore: 8, coin: 400 }, { ore: 16, fur: 6, coin: 700 }, { gold: 10, horn: 6, coin: 1200 }, { gold: 20, horn: 12, coin: 2000 }] },
-  axe:   { values: [1, 2, 3, 4, 5], swing: [0.5, 0.42, 0.36, 0.32, 0.28], costs: [{ plank: 5, coin: 40 }, { block: 6, coin: 120 }, { ore: 8, coin: 300 }, { gold: 8, coin: 900 }] },
-  pick:  { values: [1, 2, 3, 4, 5], swing: [0.55, 0.46, 0.4, 0.34, 0.3], costs: [{ plank: 5, coin: 50 }, { block: 6, coin: 140 }, { ore: 8, coin: 300 }, { gold: 8, coin: 900 }] },
+  sword: { values: [1, 2, 3, 5, 7, 10, 14, 20, 28, 40], swing: [0.42, 0.4, 0.38, 0.36, 0.34, 0.32, 0.3, 0.28, 0.27, 0.26],
+    costs: [{ block: 3, coin: 40 }, { block: 6, jelly: 4, coin: 100 }, { block: 10, jelly: 8, coin: 220 }, { block: 10, ore: 8, coin: 400 }, { ore: 16, fur: 6, coin: 700 }, { gold: 10, horn: 6, coin: 1200 }, { gold: 20, horn: 12, coin: 2000 }, { scale: 8, gold: 20, coin: 3500 }, { scale: 16, gold: 30, coin: 5000 }] },
+  axe:   { values: [1, 2, 3, 4, 5, 6], swing: [0.5, 0.42, 0.36, 0.32, 0.28, 0.26], costs: [{ plank: 5, coin: 40 }, { block: 6, coin: 120 }, { ore: 8, coin: 300 }, { gold: 8, coin: 900 }, { scale: 6, coin: 2500 }] },
+  pick:  { values: [1, 2, 3, 4, 5, 6], swing: [0.55, 0.46, 0.4, 0.34, 0.3, 0.28], costs: [{ plank: 5, coin: 50 }, { block: 6, coin: 140 }, { ore: 8, coin: 300 }, { gold: 8, coin: 900 }, { scale: 6, coin: 2500 }] },
 };
 
 // 素材。h = 背中に積んだときの1個の高さ、price = お店で売れる値段（ないものは売らない）
@@ -43,6 +43,8 @@ export const MATERIALS = {
   // 第3章
   gold: { color: 0xffffff, h: 0.24, price: 25 },       // 金鉱石
   horn: { color: 0xffffff, h: 0.2, price: 20 },        // 魔物の角
+  // 第4章
+  scale: { color: 0xffffff, h: 0.12, price: 40 },      // 竜のうろこ
 };
 
 // 切ったり割ったりできる資源。hits 回ぶんたたくと倒れ、たたいた分だけ素材が出て、倒れたとき bonus 個おまけ
@@ -103,6 +105,22 @@ export const ENEMY_TYPES = {
     aggro: 13, leash: 99, atkRange: 2.0, atkCd: 1.6,
     drop: { gold: 12, horn: 8 }, coins: 400, respawn: 0, color: 0x8f8a84, size: 3.0, radius: 0.5, boss: true, attacks: ['throw', 'leap'], minion: 'skeleton',
   },
+  // 第4章
+  lizard: {
+    rig: 'lizard', move: 'walk', hp: 60, speed: 1.4, chase: 3.2, dmg: 6,
+    aggro: 6, leash: 10, atkRange: 1.3, atkCd: 1.2,
+    drop: { scale: 1 }, coins: 20, respawn: 22, color: 0xe8603a, size: 1.2, radius: 0.5,
+  },
+  drake: {
+    rig: 'drake', move: 'walk', fly: 1.2, hp: 90, speed: 1.3, chase: 3.0, dmg: 7,
+    aggro: 7, leash: 10, atkRange: 1.4, atkCd: 1.4,
+    drop: { scale: 2 }, coins: 40, respawn: 28, color: 0x7a5ad9, size: 1.3, radius: 0.5,
+  },
+  dragon: {
+    rig: 'dragon', move: 'boss', fly: 2.0, hp: 1600, speed: 1.2, chase: 1.8, dmg: 6, slamDmg: 9, slamR: 3.8, rockDmg: 6, breathDmg: 5,
+    aggro: 14, leash: 99, atkRange: 2.4, atkCd: 1.4,
+    drop: { scale: 24, gold: 10 }, coins: 1000, respawn: 0, color: 0xc0453a, size: 3.2, radius: 0.5, boss: true, attacks: ['breath', 'throw', 'leap'], minion: 'drake', fire: true,
+  },
 };
 
 // 住民の仕事。node → to = その資源を集めて、その加工場へ運ぶ
@@ -133,7 +151,7 @@ export const SHOP = {
 };
 
 // 王国ランク（人口・建物の数・稼いだコインから計算）
-export const RANK = { pop: 15, building: 20, coinDiv: 10, steps: [0, 30, 80, 150, 240, 350, 480, 640, 830, 1050, 1300, 1600, 2000, 2500, 3100, 3800] };
+export const RANK = { pop: 15, building: 20, coinDiv: 10, steps: [0, 30, 80, 150, 240, 350, 480, 640, 830, 1050, 1300, 1600, 2000, 2500, 3100, 3800, 4600, 5500, 6500, 7700, 9000, 10500, 12000] };
 
 // ---- 配置の道具 ----
 function rnd(seed) {
@@ -181,7 +199,7 @@ export const CHAPTERS = {
       T(19.5, -14), T(22, -12), T(20, -9.5), T(28.5, -15), T(19, -5), T(31, -13), T(30, -9), T(31.5, 11), T(18.8, 11.5),
       R(28, 6), R(30.5, 3.8), R(29.2, 9.6), R(26.4, 11), R(31, 0.4), R(27.5, -10.5),
       // 北の森
-      ...scatter('tree', -16, 1, -34, -19, 20, 3, [[-6, -27, 4.5], [-3, -18, 2.5]]),
+      ...scatter('tree', -16, 1, -34, -19, 20, 3, [[-6, -27, 4.5], [-3, -18, 2.5], [-3, -24, 1.8], [-3, -30, 1.8], [-1.5, -33.5, 2.6]]),
       ...scatter('rock', 3, 16, -34, -20, 8, 5, [[9, -27, 4]]),
       // スライムの沼
       T(18.5, -33), T(32, -33.5), T(31.8, -19), T(18.4, -20.5),
@@ -255,8 +273,8 @@ export const CHAPTERS = {
       I(-32, -15), I(-33, -11), I(-31.5, -7.5), I(-29.5, -15.8), I(-21, -15.6), I(-18.8, -12.5), I(-23.2, -16), I(-19, -7.2),
       T(-33.5, 11.5), T(-18.6, 11.8), T(-33.8, 2.5),
       // 薬草の森
-      ...scatter('herb', -34, -19, -34, -19, 16, 7, [[-25, -27, 4.5]]),
-      ...scatter('tree', -34, -18, -34, -18, 10, 9, [[-25, -27, 4.5], [-26, -18, 2.5]]),
+      ...scatter('herb', -34, -19, -34, -19, 16, 7, [[-25, -27, 4.5], [-26, -33.5, 2.6]]),
+      ...scatter('tree', -34, -18, -34, -18, 10, 9, [[-25, -27, 4.5], [-26, -18, 2.5], [-26, -33.5, 2.6]]),
       // ゴブリンの砦
       T(-33.5, 27.5), T(-18.5, 27.8), T(-33.6, 15), I(-19, 15.5),
     ],
@@ -381,6 +399,65 @@ export const CHAPTERS = {
       { id: 'rank3',      type: 'rank',    n: 12, reward: 300 },
       { id: 'buy_valley', type: 'build',   target: 'valley', reward: 0 },
       { id: 'boss3',      type: 'boss',    kind: 'golem', reward: 0 },
+    ],
+  },
+  4: {
+    name: { before: 'ch3_after', after: 'ch4_after' }, title: 'ch4_title',
+    lands: [
+      { id: 'castle',  rect: { x0: -17, x1: 17, z0: -53, z1: -35 } },
+      { id: 'volcano', rect: { x0: 17, x1: 51, z0: -53, z1: -35 } },
+      { id: 'nest',    rect: { x0: -35, x1: -17, z0: -53, z1: -35 } },
+    ],
+    nodes: [
+      // 城の丘
+      T(-15.5, -51.5), T(15.5, -51.5), T(-15.8, -37), T(15.6, -37.2), R(-15.8, -48), R(14.5, -45),
+      // 火山の麓
+      R(19, -51), R(24, -52), R(33, -50.5), R(48.5, -51.5), R(49.5, -38), R(19.5, -37.5), R(36, -37), G(34, -44), G(49, -45),
+      // 竜の巣
+      R(-33.5, -51.5), R(-19, -51.8), R(-33.8, -37), R(-18.5, -36.8), G(-33, -44),
+    ],
+    spawns: [
+      { type: 'lizard', x: 27, z: -44, r: 4, n: 4 },
+      { type: 'drake', x: 42, z: -45, r: 4, n: 3 },
+      { type: 'lizard', x: -21, z: -40, r: 2.5, n: 2 },
+      { type: 'dragon', x: -26, z: -46, r: 2, n: 1 },
+    ],
+    builds: [
+      { id: 'castle',   type: 'land',  land: 'castle',                                           tile: [0, -33.3],    cost: { coin: 5000 },                            appear: 'buy_castle' },
+      // 城：同じ場所の大きな建設マスで、土台→壁→塔→屋根と段階的に建つ
+      { id: 'castle1',  type: 'build', model: 'castle1', x: 0, z: -46.5, w: 12, d: 8, tile: [0, -39.8], tileSize: 4, cost: { block: 120, stone: 60 },            appear: 'castle1' },
+      { id: 'castle2',  type: 'build', model: 'castle2', x: 0, z: -46.5, w: 12, d: 8, tile: [0, -39.8], tileSize: 4, cost: { block: 150, gold: 20, ore: 40 },   appear: 'castle2', colliders: [] },
+      { id: 'volcano',  type: 'land',  land: 'volcano',                                          tile: [44, -33.4],   cost: { coin: 6000 },                            appear: 'buy_volcano' },
+      { id: 'plaza',    type: 'build', model: 'plaza',   x: -11.5, z: -42, w: 7, d: 6, tile: [-11.5, -37.8], cost: { block: 80, plank: 60, medicine: 10 },           appear: 'plaza', colliders: [] },
+      { id: 'house9',   type: 'build', model: 'house',   x: 10.5, z: -41, w: 3.4, d: 3.0, tile: [10.5, -38.2], cost: { block: 60, plank: 40, scale: 4 },           appear: 'house9', pop: 2 },
+      { id: 'castle3',  type: 'build', model: 'castle3', x: 0, z: -46.5, w: 12, d: 8, tile: [0, -39.8], tileSize: 4, cost: { block: 150, gold: 40, scale: 15 },  appear: 'castle3', colliders: [] },
+      { id: 'statue',   type: 'build', model: 'statue',  x: -11.5, z: -42.5, w: 1.6, d: 1.6, tile: [-11.5, -38.6], cost: { gold: 50, block: 40, scale: 10 },     appear: 'statue' },
+      { id: 'nest',     type: 'land',  land: 'nest',                                             tile: [-26, -33.4],  cost: { coin: 10000 },                           appear: 'buy_nest' },
+      { id: 'castle4',  type: 'build', model: 'castle4', x: 0, z: -46.5, w: 12, d: 8, tile: [0, -39.8], tileSize: 4, cost: { scale: 30, gold: 40, plank: 80 },   appear: 'castle4', colliders: [] },
+    ],
+    boss: 'dragon',
+    town: {
+      roads: [[-3, -17, -3, -31], [-3, -31, 0, -37.5], [-3, -37, -11.5, -37]],
+      lamps: [[-4.8, -20], [-1.2, -20], [-4.8, -25], [-1.2, -25], [-4.8, -30], [-1.2, -30], [3, -38], [-7.5, -36]],
+      flags: [[-6.8, -40.5], [6.8, -40.5], [-15, -39], [8, -36]],
+    },
+    missions: [
+      { id: 'buy_castle',  type: 'build',  target: 'castle', reward: 300 },
+      { id: 'castle1',     type: 'build',  target: 'castle1', reward: 400 },
+      { id: 'buy_volcano', type: 'build',  target: 'volcano', reward: 400 },
+      { id: 'lizards',     type: 'kill',   kind: 'lizard', n: 5, reward: 300 },
+      { id: 'scales',      type: 'gather', kind: 'scale', n: 8, reward: 300 },
+      { id: 'castle2',     type: 'build',  target: 'castle2', reward: 500 },
+      { id: 'plaza',       type: 'build',  target: 'plaza', reward: 400 },
+      { id: 'house9',      type: 'build',  target: 'house9', reward: 300 },
+      { id: 'drakes',      type: 'kill',   kind: 'drake', n: 3, reward: 400 },
+      { id: 'castle3',     type: 'build',  target: 'castle3', reward: 600 },
+      { id: 'statue',      type: 'build',  target: 'statue', reward: 500 },
+      { id: 'tool4',       type: 'tool',   n: 1, reward: 400 },
+      { id: 'rank4',       type: 'rank',   n: 15, reward: 600 },
+      { id: 'buy_nest',    type: 'build',  target: 'nest', reward: 0 },
+      { id: 'boss4',       type: 'boss',   kind: 'dragon', reward: 0 },
+      { id: 'castle4',     type: 'build',  target: 'castle4', reward: 0 },
     ],
   },
 };

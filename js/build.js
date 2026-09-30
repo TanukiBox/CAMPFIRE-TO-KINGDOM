@@ -84,7 +84,7 @@ export class Builds {
   }
 
   makeTile(site) {
-    const t = tileModel({ mark: site.def.type === 'land' ? 'coin' : 'hammer', plate: site.def.type === 'land' ? 0xfff1c2 : 0xf6e4b8 });
+    const t = tileModel({ size: site.def.tileSize || 2.5, mark: site.def.type === 'land' ? 'coin' : 'hammer', plate: site.def.type === 'land' ? 0xfff1c2 : 0xf6e4b8 });
     t.group.position.set(site.def.tile[0], 0, site.def.tile[1]);
     scene.add(t.group);
     site.tile = t; site.tileAnim = 0;
@@ -118,7 +118,8 @@ export class Builds {
       tile.mark.rotation.y = time * 1.5;
 
       const [tx, tz] = site.def.tile;
-      site.on = player.alive && Math.abs(player.pos.x - tx) < HALF && Math.abs(player.pos.z - tz) < HALF;
+      const half = (site.def.tileSize || 2.5) / 2;
+      site.on = player.alive && Math.abs(player.pos.x - tx) < half && Math.abs(player.pos.z - tz) < half;
       tile.inner.material.opacity = site.on ? 0.55 + Math.sin(time * 10) * 0.15 : 0.3 + Math.sin(time * 3) * 0.08;
       if (!site.on) { site.depT = 0; continue; }
 

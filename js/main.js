@@ -66,6 +66,7 @@ for (const b of enemies.bosses) if (S.bosses[b.type]) b.alive = false;
 player.pos.set(ch.start[0], 0, ch.start[1]);
 if (hasSave && typeof save.px === 'number') { player.pos.set(save.px, 0, save.pz); world.resolve(player.pos, 0.36); }
 player.applyStats();
+if (S.cleared[LAST_CHAPTER]) player.m.crown.visible = true;
 if (hasSave && save.hp > 0) player.hp = Math.min(player.maxHp, save.hp);
 player.animate(0);
 if (hasSave) (save.bag || []).forEach(k => { if (MATERIALS[k] && player.bag.length < player.cap) items.put(player, k); });
@@ -277,6 +278,19 @@ const bossHooks = {
     sfx.roar();
   },
   onBossDash() { warnLine.visible = false; sfx.slash(); shake(0.3); },
+  onBossBreathWarn(e) {
+    warnLine.visible = true; warnLine.userData.t = 0; warnLine.scale.x = 1.75;
+    warnLine.position.set(e.x + e.ddx * 4.6, 0.07, e.z + e.ddz * 4.6);
+    warnLine.rotation.y = Math.atan2(e.ddx, e.ddz);
+    sfx.roar();
+  },
+  onBossBreath() { warnLine.visible = false; warnLine.scale.x = 1; sfx.fire(); shake(0.25); },
+  onBreathTick(e) {
+    for (let i = 0; i < 3; i++) {
+      const k = 0.5 + Math.random() * 8;
+      burst(e.x + e.ddx * k, 0.6 + (e.hopY || 0) * (1 - k / 9), e.z + e.ddz * k, { n: 1, colors: [0xff7a2a, 0xffc04a, 0xffe46a, 0xff4a2a], speed: 1.2, up: 2, size: 0.35, life: 0.45, g: -3, floor: false, spread: 1.2, grow: 0.8 });
+    }
+  },
   onBossThrow(e, targets) {
     sfx.roar();
     targets.forEach((tg, i) => { const w = warnPool[i]; w.visible = true; w.position.set(tg.x, 0.06, tg.z); w.userData.t = 0; w.userData.life = 1.1 + i * 0.15; });
@@ -285,7 +299,8 @@ const bossHooks = {
     sfx.slam(); shake(0.3);
     burst(r.tx, 0.3, r.tz, { n: 14, colors: [0x8f8a84, 0xb4b0a8, 0xe2c38f], speed: 4, up: 3, size: 0.18, life: 0.6 });
     ring(r.tx, r.tz, 0xe2c38f, 1.8, 0.4);
-    if (hit) player.damage(enemies.bossOf('golem').def.rockDmg, r.tx, r.tz);
+    if (hit) player.damage(r.dmg, r.tx, r.tz);
+    if (r.fire) burst(r.tx, 0.4, r.tz, { n: 10, colors: [0xff7a2a, 0xffc04a, 0xffe46a], speed: 3, up: 4, size: 0.14, life: 0.5 });
   },
   onBossSlam(e) {
     warn.visible = false;
@@ -408,11 +423,12 @@ function missionTick() {
     } else hud.toast(`⭐ ${t('missionDone')}`, 'good');
     for (const u of done.unlock || []) unlockThing(u, u === 'gear' ? null : 'unlock_' + u);
     if (done.id === 'house') unlockThing('hp');
-    if (done.type === 'boss') clearT = 2.5;
+    // 章の最後のミッションが終わったら、章クリア（最後の章ならエンディング）
+    if (!missions.current()) { if (S.ch >= LAST_CHAPTER) setTimeout(startEnding, 1200); else clearT = 2.5; }
     dirty = true;
   }
   const m = missions.current();
-  if (!m) { hud.mission(`🌟 ${t('m_free')}`, null, 0); return; }
+  if (!m) { hud.mission(`🌟 ${t(S.ch >= LAST_CHAPTER ? 'm_free_end' : 'm_free')}`, null, 0); return; }
   if (m.type === 'upgrade') hud.newDot('btnUpgrade', true);
   if (m.type === 'hire' || m.type === 'hireJob') hud.newDot('btnHire', true);
   hud.mission(t('m_' + m.id, { n: m.n }), missions.progress(m, ctx), m.reward);
@@ -430,7 +446,8 @@ function missionTarget() {
   }
   switch (m.type) {
     case 'gather': {
-      if (m.kind === 'horn') { let best = null, bd = Infinity; for (const z of ch.spawns) if ((z.type === 'skeleton' || z.type === 'troll') && world.isOwned(world.landOf(z.x, z.z))) { const d = Math.hypot(z.x - P.x, z.z - P.z); if (d < bd) { bd = d; best = z; } } return best && bd > 4 ? { x: best.x, z: best.z, y: 1.5 } : null; }
+      const hunt = { horn: ['skeleton', 'troll'], scale: ['lizard', 'drake'], fur: ['wolf'] }[m.kind];
+      if (hunt) { let best = null, bd = Infinity; for (const z of ch.spawns) if (hunt.includes(z.type) && world.isOwned(world.landOf(z.x, z.z))) { const d = Math.hypot(z.x - P.x, z.z - P.z); if (d < bd) { bd = d; best = z; } } return best && bd > 4 ? { x: best.x, z: best.z, y: 1.5 } : null; }
       const type = { wood: 'tree', ore: 'ironrock', herb: 'herb', stone: 'rock', gold: 'goldrock' }[m.kind] || 'tree';
       if (items.count(player, m.kind) >= m.n - S.mp && player.bag.length) return null;
       let best = null, bd = Infinity;
@@ -483,6 +500,85 @@ function chapterClear() {
     rank, pop, time, n, next: !!CHAPTERS[n + 1],
     shareUrl: 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(GAME_URL),
   }), 2200);
+}
+
+// ---- エンディング：城が完成 → 戴冠式 → スタッフロール → おしまい ----
+let ending = null;
+function startEnding() {
+  if (ending) return;
+  S.cleared[S.ch] = true;
+  world.setLush(1);
+  saveNow();
+  ending = { t: 0, fw: 0, crowned: false, rolled: false };
+  document.getElementById('app').classList.add('ending');
+  player.pos.set(0, 0, -37.6); player.yaw = 0; player.invul = 9999; player.hp = player.maxHp;
+  camTarget.set(0, 0, -39);
+  workers.party = { x: 0, z: -37.6 };
+  sfx.fanfare();
+  $('coronation').hidden = false;
+  $('corTitle').textContent = t('corTitle');
+  $('corSub').textContent = t('corSub');
+}
+function updateEnding(dt) {
+  const e = ending;
+  e.t += dt;
+  player.invul = 9999;
+  // 花火
+  e.fw -= dt;
+  if (e.fw <= 0 && e.t < 12) {
+    e.fw = 0.45;
+    const x = (Math.random() - 0.5) * 16, z = -46 + (Math.random() - 0.5) * 6;
+    burst(x, 9 + Math.random() * 4, z, { n: 36, colors: [0xff6b6b, 0xffd93d, 0x6bcbff, 0x7ee06a, 0xff9ff3, 0xffffff], speed: 6, up: 2, size: 0.16, life: 1.6, g: 3, floor: false });
+    sfx.pop();
+  }
+  if (!e.crowned && e.t > 2.2) {
+    e.crowned = true;
+    player.m.crown.visible = true;
+    burst(player.pos.x, 2.2, player.pos.z, { n: 30, colors: [0xffe066, 0xffffff, 0xffd34d], speed: 3, up: 4, size: 0.1, life: 1.0 });
+    ring(player.pos.x, player.pos.z, 0xffe7a0, 3, 0.6);
+    sfx.unlock();
+  }
+  if (!e.rolled && e.t > 8) { e.rolled = true; $('coronation').hidden = true; showCredits(); }
+}
+function showCredits() {
+  const rank = rankNow(), pop = workers.list.length;
+  const lines = [
+    ['big', t('title')], ['sub', t('subtitle')], ['gap'],
+    ['h', t('crStaff')], ['p', 'Tanuki Box'], ['gap'],
+    ['h', t('crCast')], ['p', t('crCast1')], ['p', t('crCast2')], ['p', t('crCast3')], ['p', t('crCast4')], ['gap'],
+    ['h', t('crTech')], ['p', 'three.js (MIT License)'], ['p', 'M PLUS Rounded 1c'], ['gap'],
+    ['h', t('crYours')], ['p', `${t('statRank')}　${rank}`], ['p', `${t('statPop')}　${pop}`], ['p', `${t('statTime')}　${fmtTime(S.time)}`],
+    ['p', t('crSold', { n: S.stats.sold.toLocaleString() })], ['p', t('crKills', { n: S.stats.kills.toLocaleString() })], ['gap'],
+    ['big', t('crThanks')],
+  ];
+  $('creditsRoll').innerHTML = lines.map(([k, v]) => k === 'gap' ? '<div class="cr-gap"></div>' : `<div class="cr-${k}">${v}</div>`).join('');
+  $('credits').hidden = false;
+  $('btnSkip').textContent = t('crSkip');
+  const roll = $('creditsRoll');
+  roll.classList.remove('rolling'); void roll.offsetWidth; roll.classList.add('rolling');
+  const done = () => { roll.removeEventListener('animationend', done); showEndCard(); };
+  roll.addEventListener('animationend', done);
+  $('btnSkip').onclick = done;
+}
+function showEndCard() {
+  $('credits').hidden = true;
+  const rank = rankNow(), pop = workers.list.length;
+  const text = t('shareText_end', { r: rank, p: pop, t: fmtTime(S.time) });
+  $('endcard').hidden = false;
+  $('endTitle').textContent = t('endTitle');
+  $('endSub').textContent = t('endSub');
+  $('endStats').innerHTML = `<div><small>${t('statRank')}</small><b>${iconImg('crown')}${rank}</b></div><div><small>${t('statPop')}</small><b>${iconImg('people')}${pop}</b></div><div><small>${t('statTime')}</small><b>${fmtTime(S.time)}</b></div>`;
+  $('endShare').textContent = '𝕏 ' + t('share');
+  $('endShare').href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(GAME_URL);
+  $('endKeep').textContent = t('keepPlaying');
+  $('endKeep').onclick = () => {
+    $('endcard').hidden = true;
+    document.getElementById('app').classList.remove('ending');
+    workers.party = null; player.invul = 1;
+    ending = null;
+    hud.toast(`👑 ${t('endFree')}`);
+    saveNow();
+  };
 }
 
 // ---- 留守の間の売上 ----
@@ -600,7 +696,8 @@ function debugStart(n) {
   }
   if (n >= 2) { S.bossDead = true; S.hired = ['lumber', 'miner', 'carrier', 'keeper']; S.up.speed = 2; S.up.hp = 2; S.tool = { sword: 3, axe: 2, pick: 2 }; }
   if (n >= 3) { S.hired.push('herbalist', 'carrier'); S.up.speed = 4; S.up.hp = 4; S.tool = { sword: 5, axe: 3, pick: 3 }; }
-  const later = { 2: ['ore', 'fur', 'herb', 'medicine'], 3: ['gold', 'horn'] };
+  if (n >= 4) { S.hired.push('soldier', 'soldier', 'carrier'); S.up.speed = 6; S.up.hp = 6; S.tool = { sword: 7, axe: 4, pick: 4 }; }
+  const later = { 2: ['ore', 'fur', 'herb', 'medicine'], 3: ['gold', 'horn'], 4: ['scale'] };
   const kinds = Object.keys(MATERIALS).filter(k => !Object.keys(later).some(c => +c > n && later[c].includes(k))), cap = UPGRADES.bag.values[S.up.bag];
   writeSave({ v: 2, state: S, builds: done, bag: Array.from({ length: cap - 10 }, (_, i) => kinds[i % kinds.length]), hp: 99, settings }, SLOT);
   sessionStorage.setItem('ctk-autostart', '1');
@@ -621,7 +718,7 @@ if (stressN > 0) {
 }
 const showFps = stressN > 0 || params.has('fps');
 // 動作確認用：ctk.step(秒) で画面を描かずに時間を進められる
-if (DEBUG) window.ctk = { S, player, items, builds, resources, enemies, world, stations, workers, missions, step: sec => { for (let i = 0; i < sec * 30; i++) tick(1 / 30, false); } };
+if (DEBUG) window.ctk = { S, player, items, builds, resources, enemies, world, stations, workers, missions, startEnding: () => startEnding(), step: sec => { for (let i = 0; i < sec * 30; i++) tick(1 / 30, false); } };
 
 // ---- 毎フレーム ----
 const move = { x: 0, z: 0, m: 0 };
@@ -646,7 +743,8 @@ function tick(raw, show) {
   if (!paused) S.time += dt;
   perfTick(raw);
 
-  if (paused) { move.x = move.z = move.m = 0; } else readMove(move);
+  if (paused || ending) { move.x = move.z = move.m = 0; } else readMove(move);
+  if (ending) updateEnding(fdt);
   if (!paused) {
     player.update(dt, { move, world, resources, enemies });
     enemies.update(dt, player, bossHooks);
@@ -701,8 +799,10 @@ function tick(raw, show) {
 
   // カメラは主人公を追いかける（回転なし）
   const ck = Math.min(1, fdt * 7);
-  camTarget.x += (player.pos.x - camTarget.x) * ck;
-  camTarget.z += (player.pos.z - camTarget.z) * ck;
+  // エンディング中は城の方を見る
+  const fx = ending ? 0 : player.pos.x, fz = ending ? -41.5 : player.pos.z;
+  camTarget.x += (fx - camTarget.x) * ck * (ending ? 0.3 : 1);
+  camTarget.z += (fz - camTarget.z) * ck * (ending ? 0.3 : 1);
   placeCamera(camTarget, shakeState.x, shakeState.y);
   if (show) renderer.render(scene, camera);
 

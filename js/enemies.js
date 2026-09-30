@@ -4,7 +4,7 @@ import * as THREE from './lib/three.module.min.js';
 import { Rig } from './rig.js';
 import * as THREE2 from './lib/three.module.min.js';
 import { scene, mat } from './gfx.js';
-import { slimeParts, mushroomParts, bossParts, wolfParts, goblinParts, chiefParts, trollParts, skeletonParts, golemParts } from './models.js';
+import { slimeParts, mushroomParts, bossParts, wolfParts, goblinParts, chiefParts, trollParts, skeletonParts, golemParts, lizardParts, drakeParts, dragonParts } from './models.js';
 import { ENEMY_TYPES } from './data.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _w = new THREE.Color(0xffffff);
@@ -21,10 +21,11 @@ export class Enemies {
       slime: new Rig(slimeParts(), cap), mushroom: new Rig(mushroomParts(), 60), boss: new Rig(bossParts(), 2),
       wolf: new Rig(wolfParts(), 60), goblin: new Rig(goblinParts(), 60), chief: new Rig(chiefParts(), 2),
       troll: new Rig(trollParts(), 30), skeleton: new Rig(skeletonParts(), 60), golem: new Rig(golemParts(), 2),
+      lizard: new Rig(lizardParts(), 40), drake: new Rig(drakeParts(), 40), dragon: new Rig(dragonParts(), 2),
     };
     // 巨人が投げる岩
     this.rocks = [];
-    this.rockMeshes = Array.from({ length: 6 }, () => { const m = new THREE2.Mesh(new THREE2.DodecahedronGeometry(0.55, 0), mat(0x8f8a84)); m.visible = false; m.castShadow = true; scene.add(m); return m; });
+    this.rockMeshes = Array.from({ length: 6 }, () => { const m = new THREE2.Mesh(new THREE2.DodecahedronGeometry(0.55, 0), new THREE2.MeshLambertMaterial({ color: 0x8f8a84, flatShading: true })); m.visible = false; m.castShadow = true; scene.add(m); return m; });
     this.bosses = [];
     for (const z of ch.spawns) for (let i = 0; i < z.n; i++) this.spawn(z.type, z);
   }
@@ -164,6 +165,8 @@ export class Enemies {
         this.face(e, dx, dz, dt);
       }
     }
+    // 空を飛ぶ敵
+    if (def.fly && e.phase !== 'leap') e.hopY = def.fly + Math.sin(e.walk * 0.4 + e.x) * 0.25;
     if (e.kx || e.kz) {
       e.x += e.kx * dt; e.z += e.kz * dt;
       const k = Math.pow(0.001, dt); e.kx *= k; e.kz *= k;
@@ -191,8 +194,14 @@ export class Enemies {
       if (dp < def.atkRange + e.r * 0.5 && e.cd <= 0) { player.damage(def.dmg, e.x, e.z); e.cd = def.atkCd; e.lunge = 0.3; }
       if (e.pt > 3.2) {
         const atk = def.attacks[e.cycles % def.attacks.length];
-        e.pt = 0; e.hopY = 0;
+        e.pt = 0; if (!def.fly) e.hopY = 0;
         if (atk === 'throw') { e.phase = 'throwwind'; }
+        else if (atk === 'breath') {
+          e.phase = 'breathwind';
+          const dx = P.x - e.x, dz = P.z - e.z, d = Math.hypot(dx, dz) || 1;
+          e.ddx = dx / d; e.ddz = dz / d;
+          hooks.onBossBreathWarn(e);
+        }
         else if (atk === 'dash') {
           e.phase = 'windup';
           const dx = P.x - e.x, dz = P.z - e.z, d = Math.hypot(dx, dz) || 1;
@@ -200,12 +209,22 @@ export class Enemies {
           hooks.onBossDashWarn(e);
         } else e.phase = 'charge';
       }
+    } else if (e.phase === 'breathwind') {
+      e.yaw = Math.atan2(e.ddx, e.ddz);
+      if (e.pt > 0.8) { e.phase = 'breath'; e.pt = 0; hooks.onBossBreath(e); }
+    } else if (e.phase === 'breath') {
+      // 火を吹く：前方の細長い範囲にいるとダメージ
+      const px = P.x - e.x, pz = P.z - e.z;
+      const along = px * e.ddx + pz * e.ddz, side = Math.abs(px * e.ddz - pz * e.ddx);
+      if (player.alive && along > 0.3 && along < 8.5 && side < 1.4) player.damage(def.breathDmg, e.x, e.z);
+      hooks.onBreathTick(e, dt);
+      if (e.pt > 1.3) { e.phase = 'rest'; e.pt = 0; e.cycles++; if (e.cycles % 3 === 0) hooks.onBossCall(e); }
     } else if (e.phase === 'throwwind') {
       this.face(e, P.x - e.x, P.z - e.z, dt);
       if (e.pt > 0.8) {
         e.phase = 'rest'; e.pt = 0; e.cycles++;
         const targets = [[0, 0], [2.2, 1.2], [-2.2, 1.2]].map(([ox, oz]) => ({ x: P.x + ox * (Math.random() + 0.5), z: P.z + oz * (Math.random() + 0.5) - 0.6 }));
-        targets.forEach((tg, i) => this.rocks.push({ fx: e.x, fz: e.z, fy: 3.5, tx: tg.x, tz: tg.z, t: -i * 0.15, dur: 1.1, mesh: null }));
+        targets.forEach((tg, i) => this.rocks.push({ fx: e.x, fz: e.z, fy: 3.5, tx: tg.x, tz: tg.z, t: -i * 0.15, dur: 1.1, mesh: null, fire: !!def.fire, dmg: def.rockDmg }));
         hooks.onBossThrow(e, targets);
         if (e.cycles % 3 === 0) hooks.onBossCall(e);
       }
@@ -247,7 +266,10 @@ export class Enemies {
       r.t += dt;
       if (r.t < 0) continue;
       const k = Math.min(1, r.t / r.dur);
-      if (!r.mesh) r.mesh = this.rockMeshes.find(m => !m.visible) || null;
+      if (!r.mesh) {
+        r.mesh = this.rockMeshes.find(m => !m.visible) || null;
+        if (r.mesh) { r.mesh.material.color.setHex(r.fire ? 0xff7a2a : 0x8f8a84); r.mesh.material.emissive.setHex(r.fire ? 0x8a2a00 : 0x000000); }
+      }
       if (r.mesh) { r.mesh.visible = true; r.mesh.position.set(r.fx + (r.tx - r.fx) * k, r.fy * (1 - k) + Math.sin(k * Math.PI) * 5, r.fz + (r.tz - r.fz) * k); r.mesh.rotation.set(k * 9, k * 7, 0); }
       if (k >= 1) {
         if (r.mesh) r.mesh.visible = false;
@@ -268,7 +290,7 @@ export class Enemies {
       const y = e.hopY || 0;
       if (e.state === 'spawn') { const k = Math.min(1, e.t / 0.5); sx = sy = k * (1.3 - 0.3 * k); }
       else if (e.phase === 'charge') { const k = Math.min(1, e.pt / 0.7); sy = 1 - 0.3 * k; sx = 1 + 0.2 * k; }
-      else if (e.phase === 'windup' || e.phase === 'throwwind') { sy = 0.9; sx = 1.08; }
+      else if (e.phase === 'windup' || e.phase === 'throwwind' || e.phase === 'breathwind') { sy = 0.9; sx = 1.08; }
       else if (!HOPPERS.includes(def.rig)) { sy = 1 + Math.sin(e.walk * 2) * 0.04; }
       else if (y > 0.02) { sy = 1.12; sx = 0.92; }
       else { const ph = (e.hop % 1); sy = 0.86 + ph * 0.1; sx = 1.08 - ph * 0.06; }
@@ -279,7 +301,8 @@ export class Enemies {
       if (!HOPPERS.includes(def.rig)) {
         const w = Math.sin(e.walk) * 0.6;
         ang.fill(0);
-        if (def.rig === 'wolf') { ang[0] = w; ang[1] = -w; ang[2] = -w; ang[3] = w; }
+        if (def.rig === 'wolf' || def.rig === 'lizard') { ang[0] = w; ang[1] = -w; ang[2] = -w; ang[3] = w; }
+        else if (def.fly) { const f = Math.sin(performance.now() / 1000 * (def.boss ? 5 : 9) + e.x) * 0.7; ang[0] = f; ang[1] = -f; }
         else {
           ang[0] = w; ang[1] = -w;
           if (HUMANOIDS.includes(def.rig)) {

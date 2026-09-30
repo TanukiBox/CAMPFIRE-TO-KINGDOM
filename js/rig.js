@@ -12,7 +12,7 @@ export class Rig {
       m.frustumCulled = false; m.count = 0;
       if (p.tint) m.setColorAt(0, new THREE.Color());
       scene.add(m);
-      return { mesh: m, tint: !!p.tint, pivot: p.pivot || null };
+      return { mesh: m, tint: !!p.tint, pivot: p.pivot || null, axis: p.axis || 'x' };
     });
     this.cap = cap; this.n = 0;
   }
@@ -25,10 +25,17 @@ export class Rig {
       const p = this.parts[k];
       const a = angles ? angles[k] : 0;
       if (a && p.pivot) {
-        const [, py, pz] = p.pivot, c = Math.cos(a), s = Math.sin(a);
-        _l.makeRotationX(a);
-        _l.elements[13] = py - (py * c - pz * s);
-        _l.elements[14] = pz - (py * s + pz * c);
+        const [px, py, pz] = p.pivot, c = Math.cos(a), s = Math.sin(a);
+        if (p.axis === 'z') {
+          // 羽ばたき（前後の軸まわり）
+          _l.makeRotationZ(a);
+          _l.elements[12] = px - (px * c - py * s);
+          _l.elements[13] = py - (px * s + py * c);
+        } else {
+          _l.makeRotationX(a);
+          _l.elements[13] = py - (py * c - pz * s);
+          _l.elements[14] = pz - (py * s + pz * c);
+        }
         _o.multiplyMatrices(root, _l);
         p.mesh.setMatrixAt(i, _o);
       } else p.mesh.setMatrixAt(i, root);

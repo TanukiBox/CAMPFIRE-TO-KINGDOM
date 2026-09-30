@@ -287,3 +287,29 @@ html, body {
 .debug-box p { margin: 0 0 6px; }
 .debug-box button { font: inherit; font-weight: 800; border-radius: 10px; border: 2px solid var(--line); background: #fff; padding: 6px 10px; }
 .debug-box button:disabled { opacity: .4; }
+
+/* ---- エンディング ---- */
+#app.ending .hud, #app.ending .side-btns, #app.ending #moveHint, #app.ending #labels { display: none; }
+.coronation {
+  position: absolute; left: 0; right: 0; top: 18%; text-align: center; pointer-events: none;
+  animation: corIn 1.2s cubic-bezier(.3, 1.4, .5, 1) both;
+}
+.coronation h1 {
+  margin: 0; font-size: clamp(40px, 12vw, 72px); color: #fff; font-weight: 800;
+  text-shadow: 0 4px 0 #b4541f, 0 8px 18px rgba(0, 0, 0, .3); -webkit-text-stroke: 2px #b4541f; paint-order: stroke fill;
+}
+.coronation p { margin: 8px 0 0; font-size: clamp(16px, 4.6vw, 22px); font-weight: 800; color: #fff; text-shadow: 0 2px 0 #7a4a2a, 0 0 8px rgba(0,0,0,.35); }
+.cor-crown { font-size: 54px; animation: pulse .6s ease-in-out infinite alternate; }
+@keyframes corIn { from { opacity: 0; transform: scale(.6) translateY(-20px); } }
+.credits { background: linear-gradient(rgba(20, 16, 40, .88), rgba(43, 29, 20, .92)); overflow: hidden; align-items: flex-start; }
+.credits-roll { width: 100%; text-align: center; color: #fff; transform: translateY(100vh); }
+.credits-roll.rolling { animation: roll 30s linear forwards; }
+@keyframes roll { from { transform: translateY(100vh); } to { transform: translateY(-110%); } }
+.cr-big { font-size: 30px; font-weight: 800; color: #ffe07a; margin: 10px 0; }
+.cr-sub { font-size: 14px; letter-spacing: .15em; color: #f3d9b0; }
+.cr-h { font-size: 13px; color: #c9b7e8; margin-top: 6px; letter-spacing: .1em; }
+.cr-p { font-size: 18px; font-weight: 700; margin: 4px 0; }
+.cr-gap { height: 60px; }
+.skip-btn { position: absolute; right: 14px; bottom: calc(env(safe-area-inset-bottom) + 14px); font: inherit; font-weight: 800; color: #fff; background: rgba(255,255,255,.15); border: 2px solid rgba(255,255,255,.5); border-radius: 999px; padding: 6px 16px; cursor: pointer; }
+.endcard { background: radial-gradient(ellipse at center, rgba(255, 224, 122, .35), rgba(43, 29, 20, .55)); }
+.end-sheet h2.big { color: #c9861a; }

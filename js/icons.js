@@ -110,6 +110,11 @@ const DRAW = {
     g.fillStyle = '#8a3a2a'; g.beginPath(); g.moveTo(32, 10); g.quadraticCurveTo(36, 9, 40, 8); g.quadraticCurveTo(35, 12, 33, 15); g.closePath(); g.fill();
     g.strokeStyle = '#d8c8a0'; g.lineWidth = 2; g.beginPath(); g.moveTo(12, 32); g.lineTo(18, 34); g.moveTo(15, 24); g.lineTo(21, 27); g.stroke();
   },
+  scale(g) {
+    g.fillStyle = '#c0453a'; poly(g, [[24, 6], [40, 16], [40, 32], [24, 42], [8, 32], [8, 16]]); g.fill();
+    g.fillStyle = '#ff8a5a'; poly(g, [[24, 6], [40, 16], [24, 22], [8, 16]]); g.fill();
+    g.strokeStyle = '#8a2a22'; g.lineWidth = 2; g.beginPath(); g.moveTo(24, 22); g.lineTo(24, 42); g.stroke();
+  },
   heart(g) {
     g.fillStyle = '#ef4f5f';
     g.beginPath(); g.moveTo(24, 40);

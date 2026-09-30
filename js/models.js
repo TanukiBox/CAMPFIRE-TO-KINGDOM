@@ -294,6 +294,12 @@ export function playerModel() {
   box(head, 0.22, 0.1, 0.1, HAIR, 0.12, 0.46, 0.25);
   box(head, 0.66, 0.08, 0.6, 0xe24b4b, 0, 0.48, 0);
   box(head, 0.12, 0.2, 0.06, 0xe24b4b, -0.18, 0.4, -0.3, 0.3, 0, 0.2);
+  // 王冠（エンディングでかぶる）
+  const crown = new THREE.Group(); crown.position.y = 0.66; head.add(crown);
+  cyl(crown, 0.3, 0.16, C.gold, 0, 0, 0, 0, 0, 0, 10);
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; add(crown, new THREE.ConeGeometry(0.06, 0.2, 4), 0, Math.cos(a) * 0.26, 0.16, Math.sin(a) * 0.26, 1, 1, 1, 0, 0, 0, mat(C.gold)); }
+  box(crown, 0.1, 0.1, 0.06, 0xef4f5f, 0, 0, 0.3);
+  crown.visible = false;
   const armL = new THREE.Group(); armL.position.set(-0.36, 0.76, 0); body.add(armL);
   const armR = new THREE.Group(); armR.position.set(0.36, 0.76, 0); body.add(armR);
   for (const a of [armL, armR]) { box(a, 0.15, 0.3, 0.17, TUNIC, 0, -0.14, 0); box(a, 0.14, 0.13, 0.15, SKIN, 0, -0.34, 0); }
@@ -320,7 +326,7 @@ export function playerModel() {
   add(tools.sword, BOX, 0, 0, -0.52, 0, 0.05, 0.66, 0.14, 0, 0, 0, toolMat.sword);
   for (const k in tools) { tools[k].visible = false; hand.add(tools[k]); }
   root.traverse(o => { if (o.isMesh) o.castShadow = false; });
-  return { root, body, head, legL, legR, armL, armR, tools, toolMat, anchor, shoe, armor, armorMat, pack, packMat };
+  return { root, body, head, legL, legR, armL, armR, tools, toolMat, anchor, shoe, armor, armorMat, pack, packMat, crown };
 }
 // 強化レベルごとの色
 export const LEVEL_COLORS = {
@@ -346,7 +352,7 @@ export function itemGeo(kind) {
   if (kind === 'jelly') return new THREE.IcosahedronGeometry(0.15, 1).scale(1.12, 0.82, 1.12);
   if (kind === 'plank') return new THREE.BoxGeometry(0.56, 0.11, 0.24);
   if (kind === 'block') return new THREE.BoxGeometry(0.3, 0.26, 0.3);
-  return itemGeo2(kind) || itemGeo3(kind) || new THREE.BoxGeometry(0.25, 0.25, 0.25);
+  return itemGeo2(kind) || itemGeo3(kind) || itemGeo4(kind) || new THREE.BoxGeometry(0.25, 0.25, 0.25);
 }
 export const coinGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.05, 10);
 
@@ -759,4 +765,149 @@ export function golemParts() {
   ];
 }
 
-export const BUILDINGS = { house, sawmill, stonework, shop, smithy, storage, mine, pharmacy, inn, market, harbor, barracks, bigmarket, wall };
+// ---- 第4章：城（同じ場所に 土台→壁→塔→屋根 と重ねて建つ） ----
+const CS = 0xd9d2c4, CD = 0xb9b1a2, ROYAL = 0x3f5fb0;
+function castle1() {
+  const g = new THREE.Group();
+  box(g, 12, 0.8, 8, CD, 0, 0.4, 0);
+  box(g, 12.4, 0.2, 8.4, 0xa8a095, 0, 0.1, 0);
+  for (let i = 0; i < 3; i++) box(g, 4.4 - i * 0.4, 0.27, 0.6, CS, 0, 0.13 + i * 0.27, 4.3 - i * 0.3);
+  for (const [x, z] of [[-5.6, -3.6], [5.6, -3.6], [-5.6, 3.6], [5.6, 3.6]]) box(g, 1.2, 1.0, 1.2, CS, x, 0.5, z);
+  for (let i = 0; i < 6; i++) box(g, 1.6, 0.06, 0.1, 0xc9c1b2, -4.5 + i * 1.8, 0.81, 3.95);
+  return g;
+}
+function castle2() {
+  const g = new THREE.Group();
+  const y0 = 0.8, H = 3.4;
+  const wallSeg = (w, d, x, z) => {
+    box(g, w, H, d, CS, x, y0 + H / 2, z);
+    const along = w > d;
+    const n = Math.floor((along ? w : d) / 0.9);
+    for (let i = 0; i < n; i++) {
+      const o = -((along ? w : d) / 2) + 0.45 + i * 0.9;
+      if (i % 2) continue;
+      box(g, along ? 0.45 : d, 0.45, along ? d : 0.45, CS, along ? x + o : x, y0 + H + 0.22, along ? z : z + o);
+    }
+  };
+  wallSeg(12, 0.8, 0, -3.6);
+  wallSeg(0.8, 8, -5.6, 0); wallSeg(0.8, 8, 5.6, 0);
+  wallSeg(4.2, 0.8, -3.9, 3.6); wallSeg(4.2, 0.8, 3.9, 3.6);
+  // 門
+  box(g, 3.6, 1.2, 0.8, CS, 0, y0 + H - 0.6, 3.6);
+  box(g, 2.4, 2.6, 0.2, 0x5a3a2a, 0, y0 + 1.3, 3.5);
+  for (const x of [-0.6, 0, 0.6]) box(g, 0.08, 2.6, 0.24, 0x3c3f46, x, y0 + 1.3, 3.55);
+  // 天守の土台
+  box(g, 6, 3.0, 4, CS, 0, y0 + 1.5, -1.2);
+  for (const x of [-1.8, 0, 1.8]) box(g, 0.5, 0.9, 0.08, 0x3a4a6a, x, y0 + 2.0, 0.81);
+  return g;
+}
+function castle3() {
+  const g = new THREE.Group();
+  const y0 = 0.8;
+  for (const [x, z] of [[-5.6, -3.6], [5.6, -3.6], [-5.6, 3.6], [5.6, 3.6]]) {
+    cyl(g, 1.25, 5.6, CS, x, y0 + 2.8, z, 0, 0, 0, 12);
+    for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; box(g, 0.4, 0.45, 0.4, CS, x + Math.cos(a) * 1.1, y0 + 5.8, z + Math.sin(a) * 1.1); }
+    for (const yy of [2.2, 3.8]) box(g, 0.3, 0.6, 0.1, 0x3a4a6a, x, y0 + yy, z + 1.24);
+  }
+  // 天守
+  box(g, 4.6, 4.0, 3.2, 0xe4ddd0, 0, y0 + 5.0, -1.4);
+  for (const x of [-1.4, 0, 1.4]) box(g, 0.5, 1.0, 0.08, 0x3a4a6a, x, y0 + 5.2, 0.22);
+  cyl(g, 0.9, 2.6, 0xe4ddd0, 0, y0 + 8.3, -1.4, 0, 0, 0, 10);
+  // 門の塔
+  for (const x of [-2.1, 2.1]) box(g, 1.2, 5.2, 1.2, CS, x, y0 + 2.6, 3.6);
+  return g;
+}
+function castle4() {
+  const g = new THREE.Group();
+  const y0 = 0.8;
+  const cone = (r, h, x, y, z, c = ROYAL) => add(g, new THREE.ConeGeometry(r, h, 12), 0, x, y, z, 1, 1, 1, 0, 0, 0, mat(c));
+  for (const [x, z] of [[-5.6, -3.6], [5.6, -3.6], [-5.6, 3.6], [5.6, 3.6]]) {
+    cone(1.5, 2.6, x, y0 + 7.35, z);
+    add(g, new THREE.ConeGeometry(0.12, 0.5, 6), 0, x, y0 + 8.85, z, 1, 1, 1, 0, 0, 0, mat(C.gold));
+    box(g, 0.05, 1.0, 0.05, 0x3c3f46, x, y0 + 9.4, z);
+    box(g, 0.6, 0.36, 0.04, 0xc0453a, x + 0.32, y0 + 9.7, z);
+  }
+  for (const x of [-2.1, 2.1]) cone(0.95, 1.8, x, y0 + 6.1, 3.6);
+  roof(g, 5.0, 1.8, 3.6, ROYAL, 0, y0 + 7.0, -1.4);
+  cone(1.2, 2.8, 0, y0 + 11.0, -1.4);
+  add(g, new THREE.ConeGeometry(0.16, 0.7, 6), 0, 0, y0 + 12.7, -1.4, 1, 1, 1, 0, 0, 0, mat(C.gold));
+  box(g, 0.06, 1.4, 0.06, 0x3c3f46, 0, y0 + 13.4, -1.4);
+  box(g, 0.9, 0.55, 0.05, 0xc0453a, 0.48, y0 + 13.8, -1.4);
+  // 門の上の紋章
+  cyl(g, 0.55, 0.12, C.gold, 0, y0 + 3.6, 4.05, Math.PI / 2, 0, 0, 12);
+  box(g, 0.34, 0.34, 0.14, 0xc0453a, 0, y0 + 3.6, 4.1);
+  // 垂れ幕
+  for (const x of [-1.4, 1.4]) { box(g, 0.8, 2.2, 0.06, 0xc0453a, x, y0 + 5.2, 0.28); box(g, 0.3, 0.3, 0.07, C.gold, x, y0 + 5.5, 0.3); }
+  return g;
+}
+
+// 王の広場
+function plaza() {
+  const g = new THREE.Group();
+  cyl(g, 3.4, 0.12, 0xe8e0d0, 0, 0.06, -0.5, 0, 0, 0, 20);
+  cyl(g, 2.6, 0.13, 0xd9cfbd, 0, 0.07, -0.5, 0, 0, 0, 20);
+  cyl(g, 1.4, 0.14, 0xe8e0d0, 0, 0.08, -0.5, 0, 0, 0, 16);
+  for (let i = 0; i < 4; i++) {
+    const a = i / 4 * Math.PI * 2 + Math.PI / 4, x = Math.cos(a) * 3.0, z = -0.5 + Math.sin(a) * 2.6;
+    box(g, 1.0, 0.3, 1.0, 0x8a5f3a, x, 0.15, z);
+    for (let k = 0; k < 4; k++) add(g, new THREE.IcosahedronGeometry(0.14, 0), 0, x + (k % 2 - 0.5) * 0.5, 0.42, z + (Math.floor(k / 2) - 0.5) * 0.5, 1, 1, 1, 0, 0, 0, mat([0xff8fa3, 0xffe066, 0xb18cff, 0xff9f5a][k]));
+  }
+  for (const x of [-2.4, 2.4]) { box(g, 1.2, 0.1, 0.4, C.wood, x, 0.45, 1.9); box(g, 0.1, 0.4, 0.4, C.woodD, x - 0.5, 0.22, 1.9); box(g, 0.1, 0.4, 0.4, C.woodD, x + 0.5, 0.22, 1.9); }
+  return g;
+}
+
+// 記念像（金の勇者）
+function statue() {
+  const g = new THREE.Group();
+  const G = 0xf5c542;
+  box(g, 1.5, 0.9, 1.5, 0xe8e0d0, 0, 0.45, 0);
+  box(g, 1.2, 0.3, 1.2, 0xd9cfbd, 0, 1.05, 0);
+  box(g, 0.7, 0.24, 0.05, 0xc9a23a, 0, 0.55, 0.76);
+  box(g, 0.2, 0.5, 0.22, G, -0.14, 1.45, 0); box(g, 0.2, 0.5, 0.22, G, 0.14, 1.45, 0);
+  box(g, 0.62, 0.55, 0.42, G, 0, 1.95, 0);
+  box(g, 0.6, 0.55, 0.55, G, 0, 2.5, 0);
+  box(g, 0.64, 0.18, 0.58, G, 0, 2.84, 0);
+  box(g, 0.16, 0.5, 0.18, G, -0.4, 2.0, 0, 0, 0, -0.3);
+  box(g, 0.16, 0.55, 0.18, G, 0.42, 2.45, 0, 0, 0, 2.6);
+  box(g, 0.07, 1.1, 0.16, 0xfff2b0, 0.62, 3.1, 0, 0, 0, 0.3);
+  cyl(g, 0.24, 0.16, G, 0, 3.02, 0, 0, 0, 0, 8);
+  return g;
+}
+
+// ---- 第4章の素材・敵 ----
+function itemGeo4(kind) {
+  if (kind === 'scale') return faceColors(new THREE.CylinderGeometry(0.17, 0.17, 0.08, 6).scale(1, 1, 1.25), f => (f % 3 === 0 ? 0xff8a5a : 0xc0453a));
+  return null;
+}
+export function lizardParts() {
+  const B = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  const leg = (x, z) => ({ geo: B(0.12, 0.22, 0.14, x, 0.11, z), tint: true, pivot: [x, 0.22, z] });
+  const spikes = mergeGeos([0.3, 0, -0.3, -0.6, -0.9].map((z, i) => new THREE.ConeGeometry(0.07, 0.2 - i * 0.02, 4).translate(0, 0.52 - i * 0.03, z)));
+  return [
+    leg(-0.24, 0.3), leg(0.24, 0.3), leg(-0.24, -0.3), leg(0.24, -0.3),
+    { geo: B(0.5, 0.28, 1.1, 0, 0.32, 0), tint: true },
+    { geo: mergeGeos([B(0.36, 0.24, 0.46, 0, 0.36, 0.74), B(0.2, 0.14, 0.95, 0, 0.26, -0.95)]), tint: true },
+    { geo: mergeGeos([spikes, B(0.3, 0.06, 0.8, 0, 0.17, 0.05)]), color: 0xffc04a },
+    { geo: mergeGeos([B(0.07, 0.07, 0.02, -0.1, 0.44, 0.975), B(0.07, 0.07, 0.02, 0.1, 0.44, 0.975)]), color: 0x1e1a1a },
+  ];
+}
+function drakeBase(extra = []) {
+  const B = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  const wing = s => mergeGeos([B(0.9, 0.05, 0.6, s * 0.62, 0.72, -0.05), B(0.5, 0.05, 0.4, s * 1.2, 0.72, -0.2)]);
+  return [
+    { geo: wing(-1), tint: true, pivot: [-0.2, 0.72, 0], axis: 'z' },
+    { geo: wing(1), tint: true, pivot: [0.2, 0.72, 0], axis: 'z' },
+    { geo: mergeGeos([B(0.46, 0.44, 0.8, 0, 0.6, 0), B(0.18, 0.16, 0.8, 0, 0.55, -0.75)]), tint: true },
+    { geo: mergeGeos([B(0.36, 0.32, 0.42, 0, 0.92, 0.52), B(0.24, 0.16, 0.26, 0, 0.84, 0.82)]), tint: true },
+    { geo: mergeGeos([new THREE.ConeGeometry(0.05, 0.22, 4).translate(-0.12, 1.16, 0.44), new THREE.ConeGeometry(0.05, 0.22, 4).translate(0.12, 1.16, 0.44), B(0.3, 0.3, 0.5, 0, 0.5, 0.05)]), color: 0xffd98a },
+    { geo: mergeGeos([B(0.07, 0.07, 0.02, -0.1, 0.96, 0.735), B(0.07, 0.07, 0.02, 0.1, 0.96, 0.735)]), color: 0xffe04a },
+    ...extra,
+  ];
+}
+export function drakeParts() { return drakeBase(); }
+export function dragonParts() {
+  const spikes = mergeGeos([0.3, 0.05, -0.2, -0.45, -0.7, -0.95].map((z, i) => new THREE.ConeGeometry(0.06, 0.2, 4).translate(0, 0.86 - (i > 2 ? 0.2 : 0), z)));
+  return drakeBase([{ geo: spikes, color: 0x3a2a2a }]);
+}
+
+export const BUILDINGS = { house, sawmill, stonework, shop, smithy, storage, mine, pharmacy, inn, market, harbor, barracks, bigmarket, wall, castle1, castle2, castle3, castle4, plaza, statue };

@@ -149,7 +149,7 @@ export class Player {
     m.body.rotation.x = lean;
     if (!this.alive) m.body.rotation.z = Math.min(Math.PI / 2, m.body.rotation.z + dt * 6);
     else m.body.rotation.z = 0;
-    m.root.visible = !(this.invul > 0 && this.alive && Math.floor(this.invul * 16) % 2 === 1);
+    m.root.visible = !(this.invul > 0 && this.invul < 100 && this.alive && Math.floor(this.invul * 16) % 2 === 1);
     m.root.updateMatrixWorld(true);
     m.anchor.getWorldPosition(this.anchor);
   }

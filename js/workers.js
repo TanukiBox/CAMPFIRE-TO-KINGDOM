@@ -58,8 +58,9 @@ export class Workers {
   }
 
   update(dt, player, hooks) {
-    for (const w of this.list) {
+    for (const [i, w] of this.list.entries()) {
       w.moving = 0;
+      if (this.party) { this.cheer(w, i, dt); continue; }
       const job = w.job;
       if (job && JOBS[job].node) this.gatherer(w, dt, player, hooks, JOBS[job].node, JOBS[job].to);
       else if (job === 'carrier') this.carrier(w, dt, player, hooks);
@@ -186,6 +187,14 @@ export class Workers {
     }
   }
 
+  // エンディング：城の前に並んで跳びはねる
+  cheer(w, i, dt) {
+    const p = this.party, row = Math.floor(i / 8), col = i % 8;
+    const x = p.x + (col - 3.5) * 1.1, z = p.z + 1.6 + row * 1.1;
+    if (this.goTo(w, x, z, dt * 1.4, 0.2)) { w.yaw = Math.PI; w.jump = (w.jump || Math.random() * 6) + dt * 7; }
+    w.anchor.set(w.x, 0.75, w.z);
+  }
+
   // 店番：カウンターの後ろに立つ（売る速さが上がり、コインを集めてくれる）
   keeperJob(w, dt) {
     const shop = this.stations.shop;
@@ -200,7 +209,9 @@ export class Workers {
       ang[0] = s; ang[1] = -s; ang[6] = -s; ang[7] = s;
       if (w.swing > 0) ang[7] = w.swing < 0.6 ? -2.6 * (w.swing / 0.6) : -2.6 + 2.8 * ((w.swing - 0.6) / 0.35);
       if (w.job === 'keeper' && !w.moving) { ang[6] = Math.sin(time * 3) * 0.3; ang[7] = -Math.sin(time * 3) * 0.3; }
-      _m.compose(_v.set(w.x, Math.abs(Math.cos(w.walk)) * 0.06 * w.moving, w.z), _q.setFromAxisAngle(UP, w.yaw), _s);
+      const hop = this.party && !w.moving ? Math.abs(Math.sin(w.jump || 0)) * 0.35 : 0;
+      if (hop) { ang[6] = ang[7] = -2.6; }
+      _m.compose(_v.set(w.x, Math.abs(Math.cos(w.walk)) * 0.06 * w.moving + hop, w.z), _q.setFromAxisAngle(UP, w.yaw), _s);
       rig.push(_m, ang, w.color);
       blobs.push(w.x, w.z, 0.35);
     }
