@@ -114,6 +114,10 @@ const TEXT = {
     // ぬし
     boss_bigslime: '沼のぬし 大スライム', boss_goblinchief: '砦のぬし ゴブリンの親分', boss_golem: '谷のぬし 岩の巨人', boss_dragon: '竜の巣のぬし ドラゴン', bossAppear: 'ぬしが現れた！',
     // 強化
+    tabSelf: '自分', tabFac: '施設', facCap: '置ける量', facSpeed: '速さ', facNone: '強化できる施設は まだありません',
+    facDesc: '施設を強化すると 置ける量と作る速さが上がり、見た目も豪華になる', facUp: '{b}が Lv{n} になった！',
+    jobUp: '{j}が Lv{n} になった！', jobUpDesc: '雇った仕事を強化すると 運べる数・歩く速さ・作業の速さが上がる',
+    music: 'BGM', vibrate: '振動',
     upTitle: '強化', up_bag: '背中の積載量', up_speed: '移動速度', up_hp: 'HP',
     upDesc: 'コインで自分を強くする。鍛冶屋では道具を強化できる',
     buy: '強化', max: 'MAX', lv: 'Lv{n}',
@@ -263,6 +267,10 @@ const TEXT = {
     m_wood: 'Wood', m_stone: 'Stone', m_jelly: 'Slime Jelly', m_plank: 'Plank', m_block: 'Stone Block', m_ore: 'Iron Ore', m_fur: 'Fur', m_herb: 'Herb', m_medicine: 'Medicine', m_gold: 'Gold Ore', m_horn: 'Monster Horn', m_scale: 'Dragon Scale', coin: 'Coins',
     fell: 'You fainted…', dropped: 'Dropped {n} materials', droppedNone: 'You woke up by the campfire',
     boss_bigslime: 'Swamp Boss: Big Slime', boss_goblinchief: 'Fort Boss: Goblin Chief', boss_golem: 'Valley Boss: Rock Giant', boss_dragon: 'Nest Boss: Dragon', bossAppear: 'The boss appears!',
+    tabSelf: 'You', tabFac: 'Facilities', facCap: 'Capacity', facSpeed: 'Speed', facNone: 'No facilities to upgrade yet',
+    facDesc: 'Upgrading raises capacity and production speed, and makes the building fancier', facUp: '{b} is now Lv{n}!',
+    jobUp: '{j} is now Lv{n}!', jobUpDesc: 'Upgrade a job to raise carry amount, walking speed and work speed',
+    music: 'Music', vibrate: 'Vibration',
     upTitle: 'Upgrade', up_bag: 'Carry limit', up_speed: 'Move speed', up_hp: 'HP',
     upDesc: 'Spend coins to get stronger. Tools are upgraded at the smithy',
     buy: 'Upgrade', max: 'MAX', lv: 'Lv{n}',

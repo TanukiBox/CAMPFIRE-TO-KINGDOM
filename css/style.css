@@ -313,3 +313,18 @@ html, body {
 .skip-btn { position: absolute; right: 14px; bottom: calc(env(safe-area-inset-bottom) + 14px); font: inherit; font-weight: 800; color: #fff; background: rgba(255,255,255,.15); border: 2px solid rgba(255,255,255,.5); border-radius: 999px; padding: 6px 16px; cursor: pointer; }
 .endcard { background: radial-gradient(ellipse at center, rgba(255, 224, 122, .35), rgba(43, 29, 20, .55)); }
 .end-sheet h2.big { color: #c9861a; }
+
+/* ---- 強化のタブ・住民の強化ボタン ---- */
+.tabs { display: flex; gap: 6px; }
+.tabs button { flex: 1; font: inherit; font-weight: 800; border-radius: 12px; border: 2px solid var(--line); background: #fff; color: var(--ink); padding: 7px; cursor: pointer; }
+.tabs button.on { background: var(--accent); border-color: #d7702a; color: #fff; }
+.row .btns { display: flex; flex-direction: column; gap: 4px; }
+.sheet button.buy.up { font-size: 11px; min-width: 78px; padding: 4px 6px; background: #eef4ff; border-color: #b8cdf0; color: #3a5a9a; }
+.ehp { width: 46px; height: 7px; background: rgba(40, 30, 30, .75); border-radius: 4px; overflow: hidden; border: 1px solid rgba(255,255,255,.6); }
+.ehp b { display: block; height: 100%; background: linear-gradient(#ff8a7a, #e5533d); }
+.ehp.mid b { background: linear-gradient(#ffd77a, #f0a030); }
+.ehp.hi b { background: linear-gradient(#b6f28f, #58b84a); }
+.fac-label { background: rgba(255, 250, 240, .92); border: 2px solid #e2c79a; border-radius: 8px; padding: 0 6px; font-size: 11px; font-weight: 800; }
+.boss-intro { position: absolute; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none; animation: corIn .8s cubic-bezier(.3, 1.4, .5, 1) both; }
+.boss-intro small { display: block; color: #ffd0c0; font-weight: 800; letter-spacing: .2em; text-shadow: 0 2px 0 #5a1a1a; }
+.boss-intro b { display: block; font-size: clamp(30px, 9vw, 52px); color: #fff; font-weight: 800; -webkit-text-stroke: 2px #8a2a1a; paint-order: stroke fill; text-shadow: 0 4px 0 #8a2a1a, 0 6px 16px rgba(0,0,0,.4); }

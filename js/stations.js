@@ -2,8 +2,8 @@
 // 宿屋（旅人が毛皮の毛布で泊まってコインを払う）・鍛冶屋の台・倉庫・焚き火にくべるマス
 import * as THREE from './lib/three.module.min.js';
 import { scene, bake } from './gfx.js';
-import { tileModel, shipModel } from './models.js';
-import { MATERIALS, SHOP, STORAGE, INN, HARBOR } from './data.js';
+import { tileModel, shipModel, facilityDecor } from './models.js';
+import { MATERIALS, SHOP, STORAGE, INN, HARBOR, FACILITY } from './data.js';
 import { S } from './state.js';
 import { pileSpot } from './items.js';
 import { burst, floatText } from './fx.js';
@@ -87,6 +87,23 @@ export class Stations {
     return s;
   }
   get(id) { return this.proc.find(p => p.id === id); }
+  // 施設のレベル（0 = Lv1）と、それで決まる置ける量・速さ
+  lv(p) { return S.fac[p.id] || 0; }
+  inCap(p) { return Math.round(p.def.inCap * FACILITY.cap[this.lv(p)]); }
+  outCap(p) { return Math.round(p.def.outCap * FACILITY.cap[this.lv(p)]); }
+  speed(p) { return FACILITY.speed[this.lv(p)]; }
+  // レベルに合わせて飾りを付け直す
+  refreshDecor(p) {
+    const lv = this.lv(p), d = p.site.def;
+    if (p.decorLv === lv) return;
+    if (p.decor) scene.remove(p.decor);
+    p.decorLv = lv; p.decor = null;
+    if (lv > 0 && p.site.done) {
+      p.decor = bake(facilityDecor(lv, d.w, d.d, [0xc0453a, 0x3f6fb0, 0x4fae45, 0xf5a623][d.id.length % 4]));
+      p.decor.position.set(d.x, 0, d.z);
+      scene.add(p.decor);
+    }
+  }
   inCount(p, kind) { const s = this.st(p); return p.from.length > 1 ? (s.ink[kind] || 0) : s.in; }
   shopState(sh) { return sh.id === 'shop' ? S.shop : S[sh.id]; }
   stockTotal(sh = this.shop) { const st = this.shopState(sh); return sh.sells.reduce((n, k) => n + (st.stock[k] || 0), 0); }
@@ -117,7 +134,7 @@ export class Stations {
   // ---- 運び手（主人公・住民）とのやりとり。1個動かせたら true ----
   feedOne(p, c, player, hooks) {
     const st = this.st(p);
-    const room = k => this.inCount(p, k) + (p.inflightK && p.inflightK[k] || 0) < p.def.inCap;
+    const room = k => this.inCount(p, k) + (p.inflightK && p.inflightK[k] || 0) < this.inCap(p);
     const it = this.grab(c, player, k => p.from.includes(k) && room(k));
     if (!it) return false;
     const kind = it.kind;
@@ -172,16 +189,28 @@ export class Stations {
       p.outTile.group.visible = done;
       if (!done) continue;
       const st = this.st(p);
+      this.refreshDecor(p);
+      // Lv4 からは煙突の煙、Lv5 はときどき金色にきらめく
+      const lvl = this.lv(p);
+      if (lvl >= 3 && !drawOnly) {
+        p.smokeT = (p.smokeT || 0) - dt;
+        if (p.smokeT <= 0) {
+          p.smokeT = 0.6;
+          const d = p.site.def;
+          burst(d.x + d.w / 2 - 0.6, 3.4, d.z - d.d / 2 + 0.7, { n: 1, colors: [0xe8e4dc, 0xd0cac0], speed: 0.2, up: 0.8, size: 0.3, life: 2.2, g: -0.3, floor: false, grow: 1.4, spread: 0.1 });
+          if (lvl >= 4 && Math.random() < 0.3) burst(d.x, 2.6, d.z + d.d / 2, { n: 2, colors: [0xffe066, 0xfff6c0], speed: 0.8, up: 1, size: 0.07, life: 0.8, g: 0, floor: false, spread: 1.4 });
+        }
+      }
       if (p.gen) {
         // 鉱山：時間で鉱石が出てくる
-        if (st.out < p.def.outCap) {
-          st.t += dt;
+        if (st.out < this.outCap(p)) {
+          st.t += dt * this.speed(p);
           if (st.t >= p.def.every) { st.t = 0; st.out++; hooks.onMake(p.to); burst(p.outPos.x, 0.6, p.outPos.z, { n: 3, colors: [0x7d7069, 0xe0823c], speed: 1.2, up: 2, size: 0.1, life: 0.4 }); }
         }
       } else {
         const ready = p.from.every(k => this.inCount(p, k) > 0);
-        if (ready && st.out < p.def.outCap) {
-          st.t += dt;
+        if (ready && st.out < this.outCap(p)) {
+          st.t += dt * this.speed(p);
           if (st.t >= p.def.time) {
             st.t = 0; st.out++;
             if (p.from.length > 1) for (const k of p.from) st.ink[k]--; else st.in--;
@@ -320,7 +349,7 @@ export class Stations {
       const keeper = sh.keeperOk && !sh.ship ? hooks.keeper() : null;
       sh.spawnT -= dt;
       if (!sh.ship && sh.spawnT <= 0 && sh.customers.length < SHOP.queue) {
-        sh.spawnT = (keeper ? SHOP.everyKeeper : sh.every) * (0.75 + Math.random() * 0.5);
+        sh.spawnT = (keeper ? SHOP.everyKeeper / hooks.keeperBoost() : sh.every) * (0.75 + Math.random() * 0.5);
         const g = this.gate;
         sh.customers.push({ x: g.x + (Math.random() - 0.5) * 1.5, z: g.z + 4, yaw: Math.PI, walk: 0, moving: 0, state: 'come', color: new THREE.Color(SHIRTS[(Math.random() * SHIRTS.length) | 0]), want: SHOP.buy[0] + Math.floor(Math.random() * (SHOP.buy[1] - SHOP.buy[0] + 1)) });
       }
@@ -330,7 +359,7 @@ export class Stations {
       const front = queue[0];
       if (front && Math.hypot(front.x - front.tx, front.z - front.tz) < 0.15) {
         if (this.stockTotal(sh) > 0) {
-          sh.serveT += dt * (keeper ? 1.6 : 1);
+          sh.serveT += dt * (keeper ? 1.6 * hooks.keeperBoost() : 1);
           if (sh.serveT >= SHOP.serve) { sh.serveT = 0; this.sell(sh, front, hooks); }
         } else sh.waiting = front;
       }

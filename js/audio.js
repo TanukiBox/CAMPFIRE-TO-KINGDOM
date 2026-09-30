@@ -17,8 +17,13 @@ export function unlock() {
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
   if (ac.state === 'suspended') ac.resume();
+  for (const f of unlockListeners.splice(0)) f(ac);
 }
 const ready = () => on && ac && ac.state === 'running';
+// BGM などが音を出せるようになったら呼ばれる
+const unlockListeners = [];
+export function onAudioReady(f) { if (ac) f(ac); else unlockListeners.push(f); }
+export function noiseBuffer() { return nbuf; }
 
 function env(g, t, a, d, v) {
   g.gain.setValueAtTime(0.0001, t);

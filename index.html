@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20260930135115">
+<link rel="stylesheet" href="css/style.css?v=20260930181000">
 </head>
 <body>
 <div id="app">
@@ -44,6 +44,7 @@
   <div id="fade"></div>
   <div id="fps" class="fps" hidden></div>
 
+  <div id="bossIntro" class="boss-intro" hidden><small id="bossIntroSub"></small><b id="bossIntroName"></b></div>
   <div id="coronation" class="coronation" hidden><div class="cor-crown">👑</div><h1 id="corTitle"></h1><p id="corSub"></p></div>
   <div id="credits" class="credits modal" hidden><div id="creditsRoll" class="credits-roll"></div><button type="button" id="btnSkip" class="skip-btn"></button></div>
   <div id="endcard" class="modal endcard" hidden>
@@ -80,6 +81,20 @@
         </div>
       </div>
       <div class="set-row">
+        <span id="lblMusic"></span>
+        <div class="seg">
+          <button type="button" data-music="1" id="mOn"></button>
+          <button type="button" data-music="0" id="mOff"></button>
+        </div>
+      </div>
+      <div class="set-row">
+        <span id="lblVib"></span>
+        <div class="seg">
+          <button type="button" data-vib="1" id="vOn"></button>
+          <button type="button" data-vib="0" id="vOff"></button>
+        </div>
+      </div>
+      <div class="set-row">
         <span id="lblLang"></span>
         <div class="seg">
           <button type="button" data-lang="ja">日本語</button>
@@ -105,34 +120,35 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/audio.js": "./js/audio.js?v=20260930135115",
-    "./js/build.js": "./js/build.js?v=20260930135115",
-    "./js/coins.js": "./js/coins.js?v=20260930135115",
-    "./js/data.js": "./js/data.js?v=20260930135115",
-    "./js/enemies.js": "./js/enemies.js?v=20260930135115",
-    "./js/fx.js": "./js/fx.js?v=20260930135115",
-    "./js/gfx.js": "./js/gfx.js?v=20260930135115",
-    "./js/hud.js": "./js/hud.js?v=20260930135115",
-    "./js/i18n.js": "./js/i18n.js?v=20260930135115",
-    "./js/icons.js": "./js/icons.js?v=20260930135115",
-    "./js/input.js": "./js/input.js?v=20260930135115",
-    "./js/items.js": "./js/items.js?v=20260930135115",
-    "./js/lib/three.module.min.js": "./js/lib/three.module.min.js?v=20260930135115",
-    "./js/main.js": "./js/main.js?v=20260930135115",
-    "./js/missions.js": "./js/missions.js?v=20260930135115",
-    "./js/models.js": "./js/models.js?v=20260930135115",
-    "./js/player.js": "./js/player.js?v=20260930135115",
-    "./js/resources.js": "./js/resources.js?v=20260930135115",
-    "./js/rig.js": "./js/rig.js?v=20260930135115",
-    "./js/save.js": "./js/save.js?v=20260930135115",
-    "./js/state.js": "./js/state.js?v=20260930135115",
-    "./js/stations.js": "./js/stations.js?v=20260930135115",
-    "./js/ui.js": "./js/ui.js?v=20260930135115",
-    "./js/workers.js": "./js/workers.js?v=20260930135115",
-    "./js/world.js": "./js/world.js?v=20260930135115"
+    "./js/audio.js": "./js/audio.js?v=20260930181000",
+    "./js/build.js": "./js/build.js?v=20260930181000",
+    "./js/coins.js": "./js/coins.js?v=20260930181000",
+    "./js/data.js": "./js/data.js?v=20260930181000",
+    "./js/enemies.js": "./js/enemies.js?v=20260930181000",
+    "./js/fx.js": "./js/fx.js?v=20260930181000",
+    "./js/gfx.js": "./js/gfx.js?v=20260930181000",
+    "./js/hud.js": "./js/hud.js?v=20260930181000",
+    "./js/i18n.js": "./js/i18n.js?v=20260930181000",
+    "./js/icons.js": "./js/icons.js?v=20260930181000",
+    "./js/input.js": "./js/input.js?v=20260930181000",
+    "./js/items.js": "./js/items.js?v=20260930181000",
+    "./js/lib/three.module.min.js": "./js/lib/three.module.min.js?v=20260930181000",
+    "./js/main.js": "./js/main.js?v=20260930181000",
+    "./js/missions.js": "./js/missions.js?v=20260930181000",
+    "./js/models.js": "./js/models.js?v=20260930181000",
+    "./js/music.js": "./js/music.js?v=20260930181000",
+    "./js/player.js": "./js/player.js?v=20260930181000",
+    "./js/resources.js": "./js/resources.js?v=20260930181000",
+    "./js/rig.js": "./js/rig.js?v=20260930181000",
+    "./js/save.js": "./js/save.js?v=20260930181000",
+    "./js/state.js": "./js/state.js?v=20260930181000",
+    "./js/stations.js": "./js/stations.js?v=20260930181000",
+    "./js/ui.js": "./js/ui.js?v=20260930181000",
+    "./js/workers.js": "./js/workers.js?v=20260930181000",
+    "./js/world.js": "./js/world.js?v=20260930181000"
   }
 }
 </script>
-<script type="module" src="js/main.js?v=20260930135115"></script>
+<script type="module" src="js/main.js?v=20260930181000"></script>
 </body>
 </html>

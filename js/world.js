@@ -262,6 +262,16 @@ export class World {
     scene.add(this.foam);
   }
 
+  // 夜：窓に明かりがともり、焚き火が明るく見える
+  setNight(n) {
+    if (Math.abs((this.nightK ?? -1) - n) < 0.01) return;
+    this.nightK = n;
+    const glass = mat(0xa9def2);
+    glass.emissive.setRGB(1.0 * n * 0.85, 0.75 * n * 0.85, 0.35 * n * 0.85);
+    this.glowBoost = 1 + n * 1.2;
+    this.glow.scale.setScalar(1 + n * 0.6);
+  }
+
   update(t, dt = 0) {
     if (this.water) { this.water.position.y = -0.32 + Math.sin(t * 0.8) * 0.04; this.foam.material.opacity = 0.45 + Math.sin(t * 1.3) * 0.2; this.foam.position.z = this.sea - 0.15 + Math.sin(t * 0.8) * 0.12; }
     this.fireBoost = Math.max(0, this.fireBoost - dt * 1.5);
@@ -272,7 +282,7 @@ export class World {
       f.scale.set(b.r * 2 * (2 - k) * 0.9 + b.r * 0.2, b.h * k, b.r * 2 * (2 - k) * 0.9 + b.r * 0.2);
       f.rotation.y = t * (1 + i);
     });
-    this.glow.material.opacity = 0.6 + Math.sin(t * 8) * 0.08;
+    this.glow.material.opacity = Math.min(1, (0.6 + Math.sin(t * 8) * 0.08) * (this.glowBoost || 1));
   }
 
   // (fx,fz)→(tx,tz) のまっすぐな道が建物をふさいでいたら、建物の角を回る中継点を返す（ふさいでいなければ null）

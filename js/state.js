@@ -19,6 +19,9 @@ export const S = {
   port: { stock: {}, coins: 0 },
   inn: { fur: 0, coins: 0 },
   bosses: {},                // 倒したぬし
+  fac: {},                   // 施設のレベル（0 = Lv1）
+  jobLv: {},                 // 仕事ごとのレベル（0 = Lv1）
+  day: 0.1,                  // 1日のうちの時刻（0〜1）
   cleared: {},
   bossDead: false,
   time: 0,
@@ -29,7 +32,7 @@ export const S = {
 export function resetState() {
   const fresh = {
     ch: 1, coins: 0, earned: 0, up: { bag: 0, speed: 0, hp: 0 }, tool: { sword: 0, axe: 0, pick: 0 }, hired: [], lands: ['home'],
-    mission: 0, mp: 0, unlocked: {}, stations: {}, shop: { stock: { plank: 0, block: 0, jelly: 0 }, coins: 0 }, storage: {}, market: { stock: {}, coins: 0 }, bigmarket: { stock: {}, coins: 0 }, port: { stock: {}, coins: 0 }, inn: { fur: 0, coins: 0 }, bosses: {}, cleared: {}, bossDead: false,
+    mission: 0, mp: 0, unlocked: {}, stations: {}, shop: { stock: { plank: 0, block: 0, jelly: 0 }, coins: 0 }, storage: {}, market: { stock: {}, coins: 0 }, bigmarket: { stock: {}, coins: 0 }, port: { stock: {}, coins: 0 }, inn: { fur: 0, coins: 0 }, bosses: {}, fac: {}, jobLv: {}, day: 0.1, cleared: {}, bossDead: false,
     time: 0, lastSeen: 0, stats: { sold: 0, kills: 0 },
   };
   for (const k in S) delete S[k];

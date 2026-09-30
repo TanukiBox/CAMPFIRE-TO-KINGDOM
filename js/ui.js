@@ -2,7 +2,7 @@
 import { t, fmtTime } from './i18n.js';
 import { iconImg } from './icons.js';
 import { S } from './state.js';
-import { UPGRADES, TOOLS, JOBS } from './data.js';
+import { UPGRADES, TOOLS, JOBS, FACILITY, JOB_UP } from './data.js';
 
 const $ = id => document.getElementById(id);
 const coinTag = n => `<span class="cost-coin">${iconImg('coin')}${n}</span>`;
@@ -24,6 +24,9 @@ export const ui = {
       else if (act === 'up') { game.buyUpgrade(arg); this.render(); }
       else if (act === 'tool') { game.buyTool(arg); this.render(); }
       else if (act === 'hire') { game.hire(arg); this.render(); }
+      else if (act === 'tab') { this.data = { ...(this.data || {}), tab: arg }; this.render(); }
+      else if (act === 'fac') { game.buyFacility(arg); this.render(); }
+      else if (act === 'jobup') { game.buyJob(arg); this.render(); }
       else if (act === 'keep') { this.close(); game.afterClear(); }
     });
   },
@@ -48,7 +51,33 @@ export const ui = {
     if (f) $('sheet').innerHTML = f.call(this, this.data);
   },
 
-  r_upgrade() {
+  // 素材とコインの値段の表示。買えるかどうかも返す
+  costView(c) {
+    const g = this.game;
+    let ok = S.coins >= (c.coin || 0);
+    const mats = Object.keys(c).filter(m => m !== 'coin').map(m => {
+      const have = g.bagCount(m), enough = have >= c[m];
+      if (!enough) ok = false;
+      return `<span class="cost-mat${enough ? '' : ' short'}">${iconImg(m)}${have}/${c[m]}</span>`;
+    }).join('');
+    return { ok, mats };
+  },
+
+  r_upgrade(d = {}) {
+    const tab = d.tab || 'self';
+    const tabs = `<div class="tabs"><button class="${tab === 'self' ? 'on' : ''}" data-act="tab:self">${t('tabSelf')}</button><button class="${tab === 'fac' ? 'on' : ''}" data-act="tab:fac">${t('tabFac')}</button></div>`;
+    if (tab === 'fac') {
+      const list = this.game.facilities();
+      const rows = list.length ? list.map(f => {
+        const max = f.lv >= FACILITY.costs.length;
+        const cap = n => Math.round(n * FACILITY.cap[f.lv]), capN = n => Math.round(n * FACILITY.cap[f.lv + 1]);
+        const eff = `${t('facCap')} ${cap(f.cap)}${max ? '' : ` → <b>${capN(f.cap)}</b>`}　${t('facSpeed')} ×${FACILITY.speed[f.lv]}${max ? '' : ` → <b>×${FACILITY.speed[f.lv + 1]}</b>`}`;
+        let btn = `<button class="buy" disabled>${t('max')}</button>`, mats = '';
+        if (!max) { const cv = this.costView(FACILITY.costs[f.lv]); mats = cv.mats; btn = `<button class="buy" data-act="fac:${f.id}" ${cv.ok ? '' : 'disabled'}>${coinTag(FACILITY.costs[f.lv].coin)}</button>`; }
+        return `<div class="row"><div class="row-ico">${iconImg(f.icon)}</div><div class="row-main"><b>${f.name} <span class="cnt">${t('lv', { n: f.lv + 1 })}</span></b><small>${eff}</small><div class="costs">${mats}</div></div>${btn}</div>`;
+      }).join('') : `<p class="sub">${t('facNone')}</p>`;
+      return `<h2>${iconImg('hammer')} ${t('upTitle')}</h2>${tabs}<p class="sub">${t('facDesc')}</p>${rows}<button class="close" data-act="close">${t('close')}</button>`;
+    }
     const rows = Object.keys(UPGRADES).map(k => {
       const u = UPGRADES[k], lv = S.up[k], max = lv >= u.costs.length;
       const cur = u.values[lv], next = max ? '' : ` → <b>${u.values[lv + 1]}</b>`;
@@ -56,7 +85,7 @@ export const ui = {
       const btn = max ? `<button class="buy" disabled>${t('max')}</button>` : `<button class="buy" data-act="up:${k}" ${S.coins < cost ? 'disabled' : ''}>${coinTag(cost)}</button>`;
       return `<div class="row"><div class="row-ico">${iconImg({ bag: 'bag', speed: 'boot', hp: 'heart' }[k])}</div><div class="row-main"><b>${t('up_' + k)}</b><small>${t('lv', { n: lv + 1 })}　${cur}${next}</small></div>${btn}</div>`;
     }).join('');
-    return `<h2>${iconImg('hammer')} ${t('upTitle')}</h2><p class="sub">${t('upDesc')}</p>${rows}<button class="close" data-act="close">${t('close')}</button>`;
+    return `<h2>${iconImg('hammer')} ${t('upTitle')}</h2>${tabs}<p class="sub">${t('upDesc')}</p>${rows}<button class="close" data-act="close">${t('close')}</button>`;
   },
 
   r_smithy() {
@@ -90,10 +119,13 @@ export const ui = {
       const full = j.max && n >= j.max;
       const ok = built && free > 0 && S.coins >= j.cost && !full;
       const btn = full ? `<button class="buy" disabled>${t('max')}</button>` : `<button class="buy" data-act="hire:${k}" ${ok ? '' : 'disabled'}>${coinTag(j.cost)}</button>`;
-      return `<div class="row"><div class="row-ico job" style="--c:#${j.color.toString(16).padStart(6, '0')}"></div><div class="row-main"><b>${t('job_' + k)} <span class="cnt">${n ? t('hiredN', { n }) : ''}</span></b><small>${why || t('jd_' + k)}</small></div>${btn}</div>`;
+      // 仕事の強化（雇っている仕事だけ）
+      const lv = S.jobLv[k] || 0, jmax = lv >= JOB_UP.costs.length;
+      const up = !n ? '' : jmax ? `<button class="buy up" disabled>${t('lv', { n: lv + 1 })} ${t('max')}</button>` : `<button class="buy up" data-act="jobup:${k}" ${S.coins >= JOB_UP.costs[lv] ? '' : 'disabled'}>⬆${t('lv', { n: lv + 2 })} ${coinTag(JOB_UP.costs[lv])}</button>`;
+      return `<div class="row"><div class="row-ico job" style="--c:#${j.color.toString(16).padStart(6, '0')}"></div><div class="row-main"><b>${t('job_' + k)} <span class="cnt">${n ? t('hiredN', { n }) + '・' + t('lv', { n: lv + 1 }) : ''}</span></b><small>${why || t('jd_' + k)}</small></div><div class="btns">${btn}${up}</div></div>`;
     }).join('');
     const note = free <= 0 ? `<p class="warn">${t('noFree')}</p>` : '';
-    return `<h2>${iconImg('people')} ${t('hireTitle')}</h2><p class="sub">${t('hireInfo', { p: pop, w: S.hired.length, f: free })}</p>${note}${rows}<button class="close" data-act="close">${t('close')}</button>`;
+    return `<h2>${iconImg('people')} ${t('hireTitle')}</h2><p class="sub">${t('hireInfo', { p: pop, w: S.hired.length, f: free })}<br>${t('jobUpDesc')}</p>${note}${rows}<button class="close" data-act="close">${t('close')}</button>`;
   },
 
   r_clear(d) {

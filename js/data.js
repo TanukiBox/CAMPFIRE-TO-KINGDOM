@@ -10,6 +10,15 @@ export const PLAYER = {
   medicineHeal: 10,    // 薬1個で回復するHP（HPがこれだけ減ると薬を飲む）
 };
 
+// 施設の強化（Lv1〜5）。cap = 置ける量の倍率、speed = 作る速さの倍率、costs[今のレベル] = 次のレベルへの値段（素材は背中と倉庫から）
+export const FACILITY = {
+  cap: [1, 1.7, 2.5, 3.5, 5],
+  speed: [1, 1.4, 1.9, 2.5, 3.2],
+  costs: [{ coin: 150, plank: 20 }, { coin: 600, block: 30, ore: 10 }, { coin: 2000, block: 60, gold: 10 }, { coin: 5000, gold: 30, scale: 10 }],
+};
+// 住民の仕事の強化（Lv1〜5）。1レベルごとに 運べる数+2・歩く速さ+12%・作業の速さ+25%・兵士の攻撃力+35%
+export const JOB_UP = { costs: [100, 400, 1200, 3000], carry: 2, walk: 0.12, work: 0.25, dmg: 0.35 };
+
 // 倉庫に預けられる数（預けた素材は建設マス・加工場・お店・鍛冶屋で自動で使われる）
 export const STORAGE = { cap: 200 };
 

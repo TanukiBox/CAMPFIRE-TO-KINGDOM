@@ -1,7 +1,8 @@
 // 焚き火から王国へ — 全体のつなぎ込みと毎フレームの処理
 import * as THREE from './lib/three.module.min.js';
-import { renderer, scene, camera, resize, placeCamera, perfTick, perfReset, perf, quality, Blobs, params } from './gfx.js';
-import { CHAPTERS, MATERIALS, UPGRADES, TOOLS, JOBS, SHOP, PLAYER, chapterData, LAST_CHAPTER } from './data.js';
+import { renderer, scene, camera, resize, placeCamera, perfTick, perfReset, perf, quality, Blobs, params, setDay } from './gfx.js';
+import { CHAPTERS, MATERIALS, UPGRADES, TOOLS, JOBS, SHOP, PLAYER, FACILITY, JOB_UP, chapterData, LAST_CHAPTER } from './data.js';
+import { initMusic, play as playMusic, setMusic } from './music.js';
 import { S, stat, loadState, resetState, rankScore, rankOf } from './state.js';
 import { World } from './world.js';
 import { Resources } from './resources.js';
@@ -32,9 +33,15 @@ const GAME_URL = 'https://tanukibox.github.io/CAMPFIRE-TO-KINGDOM/';
 // ---- セーブの読み込みと設定 ----
 const save = loadSave(SLOT) || {};
 const hasSave = save.v === 2;
-const settings = { sound: true, lang: null, ...(save.settings || {}) };
+const settings = { sound: true, music: true, vibrate: true, lang: null, ...(save.settings || {}) };
 setLang(settings.lang || i18n.lang);
 setSound(settings.sound);
+setMusic(settings.music);
+initMusic();
+playMusic('title');
+// スマホの振動
+const vib = p => { if (settings.vibrate && navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) try { navigator.vibrate(p); } catch (e) { /* なし */ } };
+const chapterTrack = () => 'ch' + Math.min(S.ch, 4);
 if (hasSave) loadState(save.state);
 // 前の章をクリアしていて次の章があれば、次の章から
 if (S.cleared[S.ch] && CHAPTERS[S.ch + 1]) { S.ch++; S.mission = 0; S.mp = 0; S.missionId = null; }
@@ -147,6 +154,7 @@ player.hooks = {
     }
   },
   onHurt(n) {
+    vib(30);
     unlockThing('hp');
     sfx.hurt(); shake(0.25); hud.hurt();
     floatText('-' + n, player.pos.x, 1.6, player.pos.z, 'hurt');
@@ -190,6 +198,8 @@ function onKill(e) {
   S.stats.kills++;
   if (def.boss) {
     S.bosses[e.type] = true;
+    playMusic(chapterTrack());
+    vib([60, 40, 120]);
     if (e.type === 'bigslime') S.bossDead = true;
     hud.bossBar(null, null);
     for (let i = enemies.list.length - 1; i >= 0; i--) if (enemies.list[i].minion) { const m = enemies.list[i]; burst(m.x, 0.4, m.z, { n: 10, color: m.color.getHex(), speed: 3, up: 4, size: 0.14, life: 0.6 }); enemies.list.splice(i, 1); }
@@ -245,6 +255,7 @@ const stationHooks = {
   onBurnNone() { hud.toast(t('burnNone')); },
   onStorageFull() { if (!storageFullT) { storageFullT = 3; hud.toast(t('storageFull'), 'bad'); } },
   keeper: () => workers.keeper(),
+  keeperBoost: () => 1 + (S.jobLv.keeper || 0) * JOB_UP.work,
   onCoin(n, auto) {
     const k = workers.keeper();
     if (auto && k) addCoins(n, k.x, 2, k.z); else addCoins(n);
@@ -268,8 +279,16 @@ const warnLine = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 6.6).rotateX(-Math.
 warnLine.visible = false; warnLine.renderOrder = 2; scene.add(warnLine);
 const warnPool = Array.from({ length: 3 }, () => { const m = new THREE.Mesh(warn.geometry, warn.material); m.scale.setScalar(1.5); m.visible = false; m.renderOrder = 2; scene.add(m); return m; });
 const bossHooks = {
-  onBossStart(e) { sfx.roar(); shake(0.4); hud.toast(`⚠ ${t('bossAppear')}`, 'bad'); },
-  onBossEnd() { hud.bossBar(null, null); },
+  onBossStart(e) {
+    // ぬしの登場：カメラが寄って名前が出る
+    sfx.roar(); shake(0.4); vib([80, 40, 80]);
+    bossIntro = { e, t: 0 };
+    $('bossIntro').hidden = false;
+    $('bossIntroName').textContent = t('boss_' + e.type);
+    $('bossIntroSub').textContent = t('bossAppear');
+    playMusic('boss');
+  },
+  onBossEnd() { hud.bossBar(null, null); playMusic(chapterTrack()); },
   onBossLeap(e) { warn.visible = true; warn.position.set(e.lx, 0.06, e.lz); warn.userData.t = 0; warn.userData.r = e.def.slamR; },
   onBossDashWarn(e) {
     warnLine.visible = true; warnLine.userData.t = 0;
@@ -334,6 +353,37 @@ const game = {
     burst(player.pos.x, 1, player.pos.z, { n: 20, colors: [0xffe066, 0xffffff, 0x8fd3ff], speed: 3, up: 5, size: 0.12, life: 0.8 });
     hud.toast(`⬆ ${t('upgraded', { x: t('up_' + k) })}`, 'good');
     hud.newDot('btnUpgrade', false);
+    saveNow();
+  },
+  // 施設の強化
+  facilities: () => stations.proc.filter(p => p.site.done).map(p => ({ id: p.id, name: t('b_' + p.site.def.model), icon: p.to, lv: stations.lv(p), cap: p.def.inCap || p.def.outCap })),
+  buyFacility(id) {
+    const p = stations.get(id), lv = stations.lv(p);
+    if (lv >= FACILITY.costs.length) return;
+    const c = FACILITY.costs[lv];
+    if (S.coins < c.coin) return;
+    for (const m in c) if (m !== 'coin' && game.bagCount(m) < c[m]) return;
+    for (const m in c) if (m !== 'coin') stations.useMaterial(player, m, c[m]);
+    S.coins -= c.coin; S.fac[id] = lv + 1;
+    const d = p.site.def;
+    burst(d.x, 2, d.z, { n: 30, colors: [0xffe066, 0xffffff, 0x8fd3ff], speed: 4, up: 5, size: 0.14, life: 0.9 });
+    ring(d.x, d.z, 0xffe7a0, 4, 0.5); shake(0.25); vib(40);
+    p.site.anim = 0;
+    sfx.build();
+    missions.event('facility');
+    hud.toast(`🏗 ${t('facUp', { b: t('b_' + d.model), n: lv + 2 })}`, 'good');
+    saveNow();
+  },
+  // 住民の仕事の強化
+  buyJob(job) {
+    const lv = S.jobLv[job] || 0;
+    if (lv >= JOB_UP.costs.length || S.coins < JOB_UP.costs[lv]) return;
+    S.coins -= JOB_UP.costs[lv]; S.jobLv[job] = lv + 1;
+    workers.refresh();
+    for (const w of workers.list) if (w.job === job) burst(w.x, 1, w.z, { n: 10, colors: [0xffe066, 0xffffff], speed: 2, up: 3, size: 0.08, life: 0.6 });
+    sfx.upgrade();
+    missions.event('jobup');
+    hud.toast(`⬆ ${t('jobUp', { j: t('job_' + job), n: lv + 2 })}`, 'good');
     saveNow();
   },
   buyTool(k) {
@@ -503,13 +553,14 @@ function chapterClear() {
 }
 
 // ---- エンディング：城が完成 → 戴冠式 → スタッフロール → おしまい ----
-let ending = null;
+let ending = null, bossIntro = null;
 function startEnding() {
   if (ending) return;
   S.cleared[S.ch] = true;
   world.setLush(1);
   saveNow();
   ending = { t: 0, fw: 0, crowned: false, rolled: false };
+  playMusic('ending');
   document.getElementById('app').classList.add('ending');
   player.pos.set(0, 0, -37.6); player.yaw = 0; player.invul = 9999; player.hp = player.maxHp;
   camTarget.set(0, 0, -39);
@@ -573,6 +624,7 @@ function showEndCard() {
   $('endKeep').textContent = t('keepPlaying');
   $('endKeep').onclick = () => {
     $('endcard').hidden = true;
+    playMusic(chapterTrack());
     document.getElementById('app').classList.remove('ending');
     workers.party = null; player.invul = 1;
     ending = null;
@@ -622,6 +674,8 @@ hud.texts();
 function settingsTexts() {
   $('setTitle').textContent = t('settings');
   $('lblSound').textContent = t('sound');
+  $('lblMusic').textContent = t('music'); $('mOn').textContent = t('on'); $('mOff').textContent = t('off');
+  $('lblVib').textContent = t('vibrate'); $('vOn').textContent = t('on'); $('vOff').textContent = t('off');
   $('sOn').textContent = t('on'); $('sOff').textContent = t('off');
   $('lblLang').textContent = t('language');
   $('btnReset').textContent = t('reset');
@@ -635,6 +689,8 @@ function syncSettingsUi() {
   settingsTexts();
   document.querySelectorAll('[data-sound]').forEach(b => b.classList.toggle('on', (b.dataset.sound === '1') === soundOn()));
   document.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('on', b.dataset.lang === i18n.lang));
+  document.querySelectorAll('[data-music]').forEach(b => b.classList.toggle('on', (b.dataset.music === '1') === settings.music));
+  document.querySelectorAll('[data-vib]').forEach(b => b.classList.toggle('on', (b.dataset.vib === '1') === settings.vibrate));
   $('qInfo').textContent = `${t('quality')}: ×${quality.ratio} ${quality.shadows ? '☀' : ''} ${quality.auto ? '(' + t('qAuto') + ')' : ''}`;
 }
 const settingsOpen = () => !$('settings').hidden;
@@ -643,6 +699,12 @@ $('btnClose').addEventListener('click', () => { $('settings').hidden = true; per
 $('settings').addEventListener('pointerdown', e => { if (e.target.id === 'settings') $('settings').hidden = true; });
 document.querySelectorAll('[data-sound]').forEach(b => b.addEventListener('click', () => {
   settings.sound = b.dataset.sound === '1'; setSound(settings.sound); unlock(); sfx.pop(); syncSettingsUi(); saveNow();
+}));
+document.querySelectorAll('[data-music]').forEach(b => b.addEventListener('click', () => {
+  settings.music = b.dataset.music === '1'; setMusic(settings.music); unlock(); syncSettingsUi(); saveNow();
+}));
+document.querySelectorAll('[data-vib]').forEach(b => b.addEventListener('click', () => {
+  settings.vibrate = b.dataset.vib === '1'; syncSettingsUi(); vib(40); saveNow();
 }));
 document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => {
   settings.lang = b.dataset.lang; setLang(settings.lang); hud.texts(); syncSettingsUi(); saveNow();
@@ -669,6 +731,7 @@ hud.gates(S.unlocked, false);
 function begin() {
   unlock();
   started = true;
+  playMusic(chapterTrack());
   $('mission').hidden = false;
   const r = awayReport();
   if (r) ui.show('away', r);
@@ -742,6 +805,12 @@ function tick(raw, show) {
   time += fdt;
   if (!paused) S.time += dt;
   perfTick(raw);
+  // 朝・昼・夕焼け・夜（8分でひとまわり）
+  if (!paused) S.day = (S.day + dt / 480) % 1;
+  const night = setDay(S.day);
+  world.setNight(night);
+  // ぬしの登場演出
+  if (bossIntro) { bossIntro.t += fdt; if (bossIntro.t > 2.2) { bossIntro = null; $('bossIntro').hidden = true; } }
 
   if (paused || ending) { move.x = move.z = move.m = 0; } else readMove(move);
   if (ending) updateEnding(fdt);
@@ -799,11 +868,11 @@ function tick(raw, show) {
 
   // カメラは主人公を追いかける（回転なし）
   const ck = Math.min(1, fdt * 7);
-  // エンディング中は城の方を見る
-  const fx = ending ? 0 : player.pos.x, fz = ending ? -41.5 : player.pos.z;
+  // エンディング中は城の方を、ぬしの登場中はぬしを見る
+  const fx = ending ? 0 : bossIntro ? bossIntro.e.x : player.pos.x, fz = ending ? -41.5 : bossIntro ? bossIntro.e.z : player.pos.z;
   camTarget.x += (fx - camTarget.x) * ck * (ending ? 0.3 : 1);
   camTarget.z += (fz - camTarget.z) * ck * (ending ? 0.3 : 1);
-  placeCamera(camTarget, shakeState.x, shakeState.y);
+  placeCamera(camTarget, shakeState.x, shakeState.y, bossIntro ? 0.72 : 1);
   if (show) renderer.render(scene, camera);
 
   // 画面の表示
@@ -848,7 +917,7 @@ function drawLabels() {
     for (const p of stations.proc) {
       if (!p.site.done) continue;
       const st = stations.st(p);
-      if (!p.gen && close(p.inPos.x, p.inPos.z)) hud.label('in-' + p.id, p.from.map(k => `${iconImg(k)}<b>${stations.inCount(p, k)}</b>`).join(' ') + `<small>/${p.def.inCap}</small>`, p.inPos.x, 1.1, p.inPos.z, 'st-label');
+      if (!p.gen && close(p.inPos.x, p.inPos.z)) hud.label('in-' + p.id, p.from.map(k => `${iconImg(k)}<b>${stations.inCount(p, k)}</b>`).join(' ') + `<small>/${stations.inCap(p)}</small>`, p.inPos.x, 1.1, p.inPos.z, 'st-label');
       if (close(p.outPos.x, p.outPos.z) && st.out > 0) hud.label('out-' + p.id, `${iconImg(p.to)}<b>${st.out}</b>`, p.outPos.x, 1.3, p.outPos.z, 'st-label out');
     }
     for (const sh of stations.shops) {
@@ -869,6 +938,15 @@ function drawLabels() {
       if (close(inn.furPos.x, inn.furPos.z)) hud.label('inn', `${iconImg('fur')}<b>${S.inn.fur}</b><small>/20</small>`, inn.furPos.x, 1.1, inn.furPos.z, 'st-label');
       if (inn.waiting) hud.label('wait-inn', '…', inn.waiting.x, 2.1, inn.waiting.z, 'bubble');
     }
+    // 戦っているモンスターのHP
+    for (const e of enemies.list) {
+      if (!e.alive || e.def.boss || e.state === 'spawn' || !(e.hpShow > 0 || e.chasing)) continue;
+      if (Math.hypot(e.x - P.x, e.z - P.z) > 14) continue;
+      const k = Math.max(0, e.hp / e.def.hp), pct = Math.round(k * 20) * 5;
+      hud.label('ehp-' + e.id, `<b style="width:${pct}%"></b>`, e.x, (e.hopY || 0) + 1.2 * e.def.size + 0.2, e.z, 'ehp' + (k > 0.6 ? ' hi' : k > 0.3 ? ' mid' : ''));
+    }
+    // 施設のレベル
+    for (const p of stations.proc) if (p.site.done && stations.lv(p) > 0 && close(p.site.def.x, p.site.def.z)) hud.label('fac-' + p.id, t('lv', { n: stations.lv(p) + 1 }), p.site.def.x, 3.9, p.site.def.z, 'fac-label');
     // くべるマス・倉庫
     if (close(ch.burn[0], ch.burn[1])) hud.label('burn', `🔥 ${t('s_burn')}`, ch.burn[0], 0.9, ch.burn[1], 'st-label burn');
     const sto = stations.storage;

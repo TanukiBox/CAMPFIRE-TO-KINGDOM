@@ -57,8 +57,8 @@ export function resize() {
   camera.updateProjectionMatrix();
 }
 
-export function placeCamera(target, sx = 0, sy = 0) {
-  camera.position.copy(target).addScaledVector(camDir, view.dist);
+export function placeCamera(target, sx = 0, sy = 0, zoom = 1) {
+  camera.position.copy(target).addScaledVector(camDir, view.dist * zoom);
   camera.position.x += sx; camera.position.y += sy;
   camera.lookAt(target.x + sx, target.y + sy, target.z);
   sun.target.position.set(target.x, 0, target.z - 4);
@@ -196,4 +196,35 @@ export function toScreen(x, y, z, out) {
   out.behind = _v.z > 1;
   out.on = _v.z < 1 && out.x > -40 && out.x < view.w + 40 && out.y > -40 && out.y < view.h + 40;
   return out;
+}
+
+// ---- 朝・昼・夕焼け・夜 ----
+// k = 1日のうちの時刻（0〜1）。夜の度合い（0〜1）を返す
+const DAY_KEYS = [
+  [0.00, 0xcdeefc, 0xfff0d8, 2.1, 0xfffaf0, 0x9cc27c, 1.7, 0],
+  [0.50, 0xcdeefc, 0xfff0d8, 2.1, 0xfffaf0, 0x9cc27c, 1.7, 0],
+  [0.56, 0xffc29a, 0xffb070, 1.6, 0xffe0c0, 0xa0b070, 1.45, 0.15],
+  [0.62, 0x7a74b0, 0x9a8ad0, 0.8, 0xa8a8e0, 0x5a6a50, 1.1, 0.65],
+  [0.68, 0x3d4d7c, 0x9aaae8, 0.8, 0x9aaae0, 0x55604f, 1.25, 1],
+  [0.80, 0x3d4d7c, 0x9aaae8, 0.8, 0x9aaae0, 0x55604f, 1.25, 1],
+  [0.86, 0xffd6b8, 0xffc890, 1.5, 0xffe8d0, 0xa0b880, 1.4, 0.25],
+  [0.92, 0xcdeefc, 0xfff0d8, 2.1, 0xfffaf0, 0x9cc27c, 1.7, 0],
+  [1.00, 0xcdeefc, 0xfff0d8, 2.1, 0xfffaf0, 0x9cc27c, 1.7, 0],
+];
+const _c1 = new THREE.Color(), _c2 = new THREE.Color();
+const lerpHex = (target, a, b, k) => target.copy(_c1.setHex(a)).lerp(_c2.setHex(b), k);
+export function setDay(k) {
+  let i = 0;
+  while (i < DAY_KEYS.length - 2 && k >= DAY_KEYS[i + 1][0]) i++;
+  const A = DAY_KEYS[i], B = DAY_KEYS[i + 1];
+  const f = Math.min(1, Math.max(0, (k - A[0]) / Math.max(1e-6, B[0] - A[0])));
+  const s = f * f * (3 - 2 * f);
+  lerpHex(scene.background, A[1], B[1], s);
+  scene.fog.color.copy(scene.background);
+  lerpHex(sun.color, A[2], B[2], s);
+  sun.intensity = A[3] + (B[3] - A[3]) * s;
+  lerpHex(hemi.color, A[4], B[4], s);
+  lerpHex(hemi.groundColor, A[5], B[5], s);
+  hemi.intensity = A[6] + (B[6] - A[6]) * s;
+  return A[7] + (B[7] - A[7]) * s;
 }

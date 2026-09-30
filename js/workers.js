@@ -1,6 +1,6 @@
 // 住民：家が建つと増える。雇うと木こり・鉱夫・運び手・店番として実際に歩いて働く
 import * as THREE from './lib/three.module.min.js';
-import { JOBS, NODE_TYPES } from './data.js';
+import { JOBS, NODE_TYPES, JOB_UP } from './data.js';
 import { S } from './state.js';
 import { burst } from './fx.js';
 import { sfx } from './audio.js';
@@ -36,12 +36,18 @@ export class Workers {
     this.list.forEach((w, i) => {
       const job = S.hired[i] || null;
       if (w.job !== job) { w.job = job; w.state = 'idle'; w.target = null; this.resources.release(w); }
-      w.cap = job && JOBS[job].carry ? JOBS[job].carry : 0;
+      w.cap = job && JOBS[job].carry ? JOBS[job].carry + this.lv(job) * JOB_UP.carry : 0;
       w.color.set(job ? JOBS[job].color : w.idleColor);
     });
   }
 
   free() { return this.list.length - S.hired.length; }
+  // 仕事のレベル（0 = Lv1）と倍率
+  lv(job) { return S.jobLv[job] || 0; }
+  walkMul(w) { return w.job ? 1 + this.lv(w.job) * JOB_UP.walk : 0.6; }
+  workMul(w) { return w.job ? 1 + this.lv(w.job) * JOB_UP.work : 1; }
+  // 強化したら運べる数などを付け直す
+  refresh() { for (const w of this.list) w.cap = w.job && JOBS[w.job].carry ? JOBS[w.job].carry + this.lv(w.job) * JOB_UP.carry : 0; }
   keeper() { return this.list.find(w => w.job === 'keeper') || null; }
 
   goTo(w, x, z, dt, r = 0.15) {
@@ -51,7 +57,7 @@ export class Workers {
     const wp = this.world.detour(w.x, w.z, x, z);
     if (wp) { x = wp.x; z = wp.z; }
     const dx = x - w.x, dz = z - w.z, dd = Math.hypot(dx, dz) || 1;
-    const sp = Math.min(dd, SPEED * dt);
+    const sp = Math.min(dd, SPEED * this.walkMul(w) * dt);
     w.x += dx / dd * sp; w.z += dz / dd * sp;
     w.yaw = Math.atan2(dx, dz); w.walk += dt * 10; w.moving = 1;
     return false;
@@ -80,7 +86,7 @@ export class Workers {
       const f = this.world.fire, a = Math.random() * 6.28, r = 3.5 + Math.random() * 4;
       w.tx = f.x + Math.cos(a) * r; w.tz = f.z + Math.sin(a) * r; w.t = 3 + Math.random() * 4;
     }
-    this.goTo(w, w.tx, w.tz, dt * 0.6);
+    this.goTo(w, w.tx, w.tz, dt);
   }
 
   // 木こり・鉱夫：資源をたたいて背中に積み、加工場の入口へ運ぶ
@@ -102,7 +108,7 @@ export class Workers {
     const dx = n.x - w.x, dz = n.z - w.z, d = Math.hypot(dx, dz);
     if (d > reach) { this.goTo(w, n.x - dx / d * (reach - 0.2), n.z - dz / d * (reach - 0.2), dt); w.swing = 0; return; }
     w.yaw = Math.atan2(dx, dz);
-    w.swing += dt;
+    w.swing += dt * this.workMul(w);
     if (w.swing >= 0.95) {
       w.swing = 0;
       const got = this.resources.hit(n, w.x, w.z, 1);
@@ -134,7 +140,7 @@ export class Workers {
       if (this.goTo(w, sh.stock.x, sh.stock.z, dt, 0.6)) {
         w.actT -= dt;
         if (w.actT <= 0) {
-          w.actT = 0.1;
+          w.actT = 0.1 / this.workMul(w);
           if (!this.stations.stockOne(sh, w, player, hooks)) { w.dest = null; if (!w.bag.length) w.state = 'idle'; }
         }
       }
@@ -149,7 +155,7 @@ export class Workers {
     if (this.goTo(w, w.src.outPos.x, w.src.outPos.z, dt, 0.9)) {
       w.actT -= dt;
       if (w.actT <= 0) {
-        w.actT = 0.1;
+        w.actT = 0.1 / this.workMul(w);
         if (!this.stations.takeOne(w.src, w, player, hooks)) w.state = w.bag.length ? 'stock' : 'idle';
       }
     }
@@ -178,10 +184,10 @@ export class Workers {
     const dx = e.x - w.x, dz = e.z - w.z, d = Math.hypot(dx, dz);
     if (d > e.r + 1.0) { this.goTo(w, e.x, e.z, dt * 1.15); w.swing = 0; return; }
     w.yaw = Math.atan2(dx, dz);
-    w.swing += dt;
+    w.swing += dt * this.workMul(w);
     if (w.swing >= J.every) {
       w.swing = 0;
-      const killed = this.enemies.hit(e, J.dmg, w.x, w.z);
+      const killed = this.enemies.hit(e, J.dmg * (1 + this.lv('soldier') * JOB_UP.dmg), w.x, w.z);
       hooks.onSoldierHit(e, killed, w);
       if (killed) w.foe = null;
     }

@@ -35,7 +35,7 @@ export class Enemies {
     const land = this.world.landOf(zone.x, zone.z);
     const rect = land ? this.world.land(land).rect : this.world.home;
     const e = {
-      type, def, zone, land, area: this.world.insetRects([rect]), rect,
+      id: (this.nextId = (this.nextId || 0) + 1), type, def, zone, land, area: this.world.insetRects([rect]), rect,
       hp: def.hp, alive: true, state: 'spawn', t: Math.random() * 0.3,
       x: 0, z: 0, yaw: Math.random() * 6.28, tx: 0, tz: 0, wait: Math.random() * 2, hop: Math.random(), hopY: 0, walk: 0, cd: 0,
       kx: 0, kz: 0, flash: 0, color: new THREE.Color(opts.color ?? def.color).offsetHSL((Math.random() - 0.5) * 0.04, 0, (Math.random() - 0.5) * 0.08),
@@ -68,6 +68,7 @@ export class Enemies {
     if (!e.alive) return false;
     e.hp -= dmg;
     e.flash = 0.14;
+    e.hpShow = 4;
     const dx = e.x - fx, dz = e.z - fz, d = Math.hypot(dx, dz) || 1;
     const kb = e.def.boss ? 0.6 : 6;
     e.kx = dx / d * kb; e.kz = dz / d * kb;
@@ -102,6 +103,7 @@ export class Enemies {
         continue;
       }
       e.flash = Math.max(0, e.flash - dt);
+      e.hpShow = Math.max(0, (e.hpShow || 0) - dt);
       e.cd = Math.max(0, e.cd - dt);
       e.lunge = Math.max(0, (e.lunge || 0) - dt);
       if (e.state === 'spawn') { e.t += dt; if (e.t >= 0.5) e.state = 'idle'; continue; }
@@ -110,6 +112,7 @@ export class Enemies {
       const dxp = P.x - e.x, dzp = P.z - e.z, dp = Math.hypot(dxp, dzp);
       const homeD = Math.hypot(P.x - e.zone.x, P.z - e.zone.z);
       const chase = !e.passive && player.alive && playerLand === e.land && dp < def.aggro && homeD < e.zone.r + def.leash;
+      e.chasing = chase;
       let speed = 0, tx, tz;
       if (chase) {
         tx = P.x; tz = P.z; speed = dp > def.atkRange * 0.8 ? def.chase : 0;
@@ -184,10 +187,12 @@ export class Enemies {
     const inside = player.alive && playerLand === e.land && this.world.isOwned(e.land);
     const dp = Math.hypot(P.x - e.x, P.z - e.z);
     if (!e.fight) {
-      if (inside && dp < def.aggro) { e.fight = true; e.phase = 'chase'; e.pt = 0; hooks.onBossStart(e); }
+      if (inside && dp < def.aggro) { e.fight = true; e.phase = 'chase'; e.pt = 0; e.introT = 2.2; hooks.onBossStart(e); }
       else { this.move(e, dt, 0, e.x, e.z, false); return; }
     }
     if (!inside) { e.fight = false; e.phase = 'idle'; hooks.onBossEnd(e); return; }
+    // 登場の間は動かない
+    if (e.introT > 0) { e.introT -= dt; this.face(e, P.x - e.x, P.z - e.z, dt); player.invul = Math.max(player.invul, 0.3); return; }
     e.pt += dt;
     if (e.phase === 'chase') {
       this.move(e, dt, def.chase, P.x, P.z, true);

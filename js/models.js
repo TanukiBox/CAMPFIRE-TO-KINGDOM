@@ -911,3 +911,36 @@ export function dragonParts() {
 }
 
 export const BUILDINGS = { house, sawmill, stonework, shop, smithy, storage, mine, pharmacy, inn, market, harbor, barracks, bigmarket, wall, castle1, castle2, castle3, castle4, plaza, statue };
+
+// ---- 施設のレベルごとの飾り（Lv2 花箱とランタン → Lv3 石の縁と旗 → Lv4 金の縁取りと2本目の旗 → Lv5 金の紋章） ----
+export function facilityDecor(level, w, d, color = 0xc0453a) {
+  const g = new THREE.Group();
+  const fx = w / 2, fz = d / 2;
+  if (level >= 1) {
+    for (const s of [-1, 1]) {
+      box(g, 0.7, 0.22, 0.28, C.wood, s * (fx - 0.5), 0.2, fz + 0.25);
+      for (let k = 0; k < 3; k++) box(g, 0.14, 0.14, 0.14, [0xff8fa3, 0xffe066, 0xb18cff][k], s * (fx - 0.5) + (k - 1) * 0.2, 0.37, fz + 0.25);
+    }
+    box(g, 0.08, 1.4, 0.08, 0x3c3f46, -fx - 0.3, 0.7, fz + 0.1);
+    lit(g, 0.2, 0.26, 0.2, 0xffd36a, -fx - 0.3, 1.5, fz + 0.1);
+  }
+  if (level >= 2) {
+    box(g, w + 0.5, 0.18, 0.2, 0xc9c2b4, 0, 0.09, fz + 0.1);
+    box(g, 0.2, 0.18, d + 0.5, 0xc9c2b4, -fx - 0.1, 0.09, 0);
+    box(g, 0.2, 0.18, d + 0.5, 0xc9c2b4, fx + 0.1, 0.09, 0);
+    box(g, 0.08, 3.4, 0.08, C.woodD, fx - 0.2, 1.7, -fz + 0.2);
+    box(g, 0.7, 0.42, 0.04, color, fx + 0.17, 3.1, -fz + 0.2);
+  }
+  if (level >= 3) {
+    box(g, w + 0.08, 0.08, 0.08, C.gold, 0, 0.3, fz + 0.02);
+    box(g, 0.08, 3.4, 0.08, C.woodD, -fx + 0.2, 1.7, -fz + 0.2);
+    box(g, 0.7, 0.42, 0.04, color, -fx + 0.57, 3.1, -fz + 0.2);
+    box(g, 0.34, 0.8, 0.34, C.brick, fx - 0.6, 2.9, -fz + 0.7);
+  }
+  if (level >= 4) {
+    cyl(g, 0.34, 0.1, C.gold, 0, 2.5, fz + 0.12, Math.PI / 2, 0, 0, 10);
+    box(g, 0.2, 0.2, 0.12, 0xef4f5f, 0, 2.5, fz + 0.18);
+    for (const s of [-1, 1]) add(g, new THREE.ConeGeometry(0.1, 0.3, 5), 0, s * 0.45, 2.55, fz + 0.12, 1, 1, 1, 0, 0, 0, mat(C.gold));
+  }
+  return g;
+}
