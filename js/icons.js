@@ -133,6 +133,12 @@ const DRAW = {
   crabpot(g) { g.fillStyle = '#3c3f46'; round(g, 8, 18, 32, 22, 6); g.fill(); g.fillStyle = '#ff7a5a'; g.beginPath(); g.ellipse(24, 19, 15, 5, 0, 0, 7); g.fill(); g.fillStyle = '#fff2ea'; g.fillRect(18, 16, 5, 3); },
   skewer(g) { g.strokeStyle = '#c98a4b'; g.lineWidth = 3; g.beginPath(); g.moveTo(6, 40); g.lineTo(42, 8); g.stroke(); g.fillStyle = '#e8603a'; for (const [x, y] of [[16, 31], [24, 24], [32, 17]]) g.fillRect(x - 5, y - 5, 10, 10); },
   feast(g) { g.fillStyle = '#f5c542'; g.beginPath(); g.ellipse(24, 32, 20, 8, 0, 0, 7); g.fill(); g.fillStyle = '#8a3a22'; g.beginPath(); g.arc(18, 24, 8, 0, 7); g.fill(); g.fillStyle = '#ff8a6a'; g.fillRect(26, 20, 11, 8); g.fillStyle = '#f0a830'; g.beginPath(); g.arc(31, 16, 5, 0, 7); g.fill(); },
+  box(g) {
+    g.fillStyle = '#a8452f'; poly(g, [[6, 18], [24, 10], [42, 18], [24, 26]]); g.fill();
+    g.fillStyle = '#c98a4b'; poly(g, [[6, 18], [24, 26], [24, 44], [6, 36]]); g.fill();
+    g.fillStyle = '#b07344'; poly(g, [[24, 26], [42, 18], [42, 36], [24, 44]]); g.fill();
+    g.strokeStyle = '#7a4a2a'; g.lineWidth = 2; g.beginPath(); g.moveTo(6, 27); g.lineTo(24, 35); g.lineTo(42, 27); g.stroke();
+  },
   heart(g) {
     g.fillStyle = '#ef4f5f';
     g.beginPath(); g.moveTo(24, 40);

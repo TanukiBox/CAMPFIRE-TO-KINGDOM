@@ -77,7 +77,7 @@ export class Stations {
       }
       if (d.storage) {
         const pos = at(d.storage);
-        this.storage = { site, pos, door: { x: d.x, z: d.z + d.d / 2 + 0.2 }, depT: 0, inflight: 0,
+        this.storage = { id: 'storage', site, pos, door: { x: d.x, z: d.z + d.d / 2 + 0.2 }, depT: 0, inflight: 0,
           tile: place(tileModel({ size: 1.8, mark: 'none', plate: 0xf3d9d2, border: 0xa8452f }), pos.x, pos.z) };
       }
     }
@@ -118,6 +118,19 @@ export class Stations {
   storageReady() { return !!(this.storage && this.storage.site.done); }
   storageCount(kind) { return this.storageReady() ? (S.storage[kind] || 0) : 0; }
   storageTotal() { return Object.values(S.storage).reduce((a, b) => a + b, 0); }
+  storageLv() { return S.fac.storage || 0; }
+  storageCap() { return STORAGE.cap[this.storageLv()]; }
+  storageRoom() { return this.storageReady() ? this.storageCap() - this.storageTotal() - this.storage.inflight : 0; }
+  // 運び手が倉庫へしまう（扉へ飛んでいく）
+  storeOne(c) {
+    if (this.storageRoom() <= 0) return false;
+    const it = this.items.take(c, () => true);
+    if (!it) return false;
+    const st = this.storage, kind = it.kind;
+    st.inflight++;
+    this.items.flyTo(it, st.door.x, 0.6, st.door.z, 0.3, () => { st.inflight--; S.storage[kind] = (S.storage[kind] || 0) + 1; });
+    return true;
+  }
   // 倉庫から条件に合う素材を1つ出す（倉庫の扉から飛んでいく素材を返す）
   fromStorage(pred) {
     if (!this.storageReady()) return null;
@@ -327,13 +340,14 @@ export class Stations {
     if (!st) return;
     st.tile.group.visible = st.site.done;
     if (!st.site.done) return;
+    this.refreshDecor(st);
     const on = player.alive && near(player.pos, st.pos.x, st.pos.z, 0.95);
     st.tile.inner.material.opacity = on ? 0.55 + Math.sin(time * 10) * 0.15 : 0.3;
     if (!on) { st.depT = 0; return; }
     st.depT -= dt;
     while (st.depT <= 0) {
       st.depT += 0.05;
-      if (this.storageTotal() + st.inflight >= STORAGE.cap) { hooks.onStorageFull(); st.depT = 0; break; }
+      if (this.storageTotal() + st.inflight >= this.storageCap()) { hooks.onStorageFull(); st.depT = 0; break; }
       const it = this.items.take(player, () => true);
       if (!it) { st.depT = 0; break; }
       const kind = it.kind;

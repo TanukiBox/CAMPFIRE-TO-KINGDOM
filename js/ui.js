@@ -2,7 +2,7 @@
 import { t, fmtTime } from './i18n.js';
 import { iconImg } from './icons.js';
 import { S, stat, weaponOf, armorOf } from './state.js';
-import { UPGRADES, TOOLS, JOBS, FACILITY, JOB_UP, WEAPONS, ARMORS, ENEMY_TYPES, MATERIALS, DISHES, CHAPTERS, LEVEL } from './data.js';
+import { UPGRADES, TOOLS, JOBS, FACILITY, JOB_UP, STORAGE, WEAPONS, ARMORS, ENEMY_TYPES, MATERIALS, DISHES, CHAPTERS, LEVEL } from './data.js';
 
 const $ = id => document.getElementById(id);
 const coinTag = n => `<span class="cost-coin">${iconImg('coin')}${n}</span>`;
@@ -71,6 +71,13 @@ export const ui = {
     if (tab === 'fac') {
       const list = this.game.facilities();
       const rows = list.length ? list.map(f => {
+        if (f.storage) {
+          const max = f.lv >= STORAGE.costs.length;
+          const eff = `${t('facCap')} ${STORAGE.cap[f.lv]}${max ? '' : ` → <b>${STORAGE.cap[f.lv + 1]}</b>`}　<small>(${t('nowIn', { n: f.used })})</small>`;
+          let btn = `<button class="buy" disabled>${t('max')}</button>`, mats = '';
+          if (!max) { const cv = this.costView(STORAGE.costs[f.lv]); mats = cv.mats; btn = `<button class="buy" data-act="fac:storage" ${cv.ok ? '' : 'disabled'}>${coinTag(STORAGE.costs[f.lv].coin)}</button>`; }
+          return `<div class="row"><div class="row-ico">${iconImg('box')}</div><div class="row-main"><b>${f.name} <span class="cnt">${t('lv', { n: f.lv + 1 })}</span></b><small>${eff}</small><div class="costs">${mats}</div></div>${btn}</div>`;
+        }
         const max = f.lv >= FACILITY.costs.length;
         const cap = n => Math.round(n * FACILITY.cap[f.lv]), capN = n => Math.round(n * FACILITY.cap[f.lv + 1]);
         const eff = `${t('facCap')} ${cap(f.cap)}${max ? '' : ` → <b>${capN(f.cap)}</b>`}　${t('facSpeed')} ×${FACILITY.speed[f.lv]}${max ? '' : ` → <b>×${FACILITY.speed[f.lv + 1]}</b>`}`;

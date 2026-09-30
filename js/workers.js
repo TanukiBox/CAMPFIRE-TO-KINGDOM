@@ -1,6 +1,6 @@
 // 住民：家が建つと増える。雇うと木こり・鉱夫・運び手・店番として実際に歩いて働く
 import * as THREE from './lib/three.module.min.js';
-import { JOBS, NODE_TYPES, JOB_UP } from './data.js';
+import { JOBS, NODE_TYPES, JOB_UP, STORAGE } from './data.js';
 import { S } from './state.js';
 import { burst } from './fx.js';
 import { sfx } from './audio.js';
@@ -122,68 +122,87 @@ export class Workers {
     }
   }
 
-  // 運び手：加工場・鉱山の出口から、それを売っているお店・市場のカウンターへ
+  // 運び手：加工場・鉱山の出口の物を倉庫へ。倉庫に一定より多くたまった物は市場・港へ運んで売る。
+  // 食堂の材料が倉庫にあれば、それをいちばん先に厨房へ運ぶ
   carrier(w, dt, player, hooks) {
-    const open = this.stations.shops.filter(sh => sh.site.done);
-    if (!open.length) return this.idle(w, dt);
-    // 倉庫にある料理の材料を、食堂の厨房へ運ぶ（これを先にやる）
-    const kit = this.stations.kitchen, sto = this.stations.storage;
-    if (w.state === 'kdeliver' || w.state === 'kfetch' || (!w.bag.length && this.stations.kitchenWants())) {
+    const S_ = this.stations, sto = S_.storageReady() ? S_.storage : null, kit = S_.kitchen;
+    const open = S_.shops.filter(sh => sh.site.done && !sh.kitchen);
+    const act = (t, f) => { w.actT -= dt; if (w.actT <= 0) { w.actT = t / this.workMul(w); f(); } };
+    // 厨房へ
+    if (w.state === 'kdeliver' || w.state === 'kfetch' || (!w.bag.length && S_.kitchenWants())) {
       if (w.state !== 'kdeliver') {
         w.state = 'kfetch';
-        if (this.goTo(w, sto.pos.x, sto.pos.z, dt, 0.8)) {
-          w.actT -= dt;
-          if (w.actT <= 0) {
-            w.actT = 0.08 / this.workMul(w);
-            const m = this.stations.kitchenWants();
-            if (m && w.bag.length < w.cap) { S.storage[m]--; this.items.give(w, m, sto.door.x, 1, sto.door.z); }
-            else w.state = w.bag.length ? 'kdeliver' : 'idle';
-          }
-        }
+        if (this.goTo(w, sto.pos.x, sto.pos.z, dt, 0.8)) act(0.08, () => {
+          const m = S_.kitchenWants();
+          if (m && w.bag.length < w.cap) { S.storage[m]--; this.items.give(w, m, sto.door.x, 1, sto.door.z); }
+          else w.state = w.bag.length ? 'kdeliver' : 'idle';
+        });
         return;
       }
-      if (this.goTo(w, kit.inPos.x, kit.inPos.z, dt, 0.7)) {
-        w.actT -= dt;
-        if (w.actT <= 0) {
-          w.actT = 0.1 / this.workMul(w);
-          if (!this.stations.feedOne(kit, w, player, hooks) && w.bag.every(it => it.state === 'bag')) w.state = w.bag.length ? 'kdeliver' : 'idle';
-        }
-      }
+      if (this.goTo(w, kit.inPos.x, kit.inPos.z, dt, 0.7)) act(0.1, () => {
+        if (!S_.feedOne(kit, w, player, hooks) && w.bag.every(it => it.state === 'bag')) w.state = w.bag.length ? 'kdeliver' : 'idle';
+      });
       return;
     }
-    const sold = k => open.some(sh => sh.sells.includes(k));
-    if (w.state === 'stock' || (w.bag.length > 0 && w.state !== 'load')) {
-      w.state = 'stock';
-      // 背中の物を売っていて、すいているお店へ
-      if (!w.dest || !w.dest.site.done || !w.bag.some(it => w.dest.sells.includes(it.kind))) {
-        const cands = open.filter(sh => w.bag.some(it => sh.sells.includes(it.kind)));
-        cands.sort((a, b) => this.stations.stockTotal(a) / a.cap - this.stations.stockTotal(b) / b.cap);
-        w.dest = cands[0] || null;
-      }
-      const sh = w.dest;
-      if (!sh) { w.state = 'idle'; return; }
-      if (this.goTo(w, sh.stock.x, sh.stock.z, dt, 0.6)) {
-        w.actT -= dt;
-        if (w.actT <= 0) {
-          w.actT = 0.1 / this.workMul(w);
-          if (!this.stations.stockOne(sh, w, player, hooks)) { w.dest = null; if (!w.bag.length) w.state = 'idle'; }
-        }
-      }
+    // 倉庫の余りを市場・港へ（倉庫で積む → お店へ）
+    if (w.state === 'sfetch') {
+      if (!sto) { w.state = 'idle'; return; }
+      if (this.goTo(w, sto.pos.x, sto.pos.z, dt, 0.8)) act(0.08, () => {
+        const k = w.fetchKind;
+        if (w.bag.length < w.cap && (S.storage[k] || 0) > STORAGE.keep) { S.storage[k]--; this.items.give(w, k, sto.door.x, 1, sto.door.z); }
+        else w.state = w.bag.length ? 'toshop' : 'idle';
+      });
       return;
     }
-    if (w.state !== 'load' || !w.src || this.stations.st(w.src).out <= 0) {
+    // 背中の物を届ける
+    if (w.bag.length && w.state !== 'load') {
+      // 倉庫がいっぱい・倉庫がないときはお店へ
+      if (w.state !== 'toshop' && (!sto || S_.storageRoom() <= 0) && open.some(sh => w.bag.some(it => sh.sells.includes(it.kind)))) w.state = 'toshop';
+      if (w.state === 'toshop') {
+        if (!w.dest || !w.dest.site.done || !w.bag.some(it => w.dest.sells.includes(it.kind))) {
+          const cands = open.filter(sh => w.bag.some(it => sh.sells.includes(it.kind)));
+          cands.sort((a, b) => S_.stockTotal(a) / a.cap - S_.stockTotal(b) / b.cap);
+          w.dest = cands[0] || null;
+        }
+        const sh = w.dest;
+        if (!sh) { w.state = sto ? 'tosto' : 'idle'; if (!sto) this.idle(w, dt); return; }
+        if (this.goTo(w, sh.stock.x, sh.stock.z, dt, 0.6)) act(0.1, () => {
+          if (!S_.stockOne(sh, w, player, hooks)) { w.dest = null; if (!w.bag.length) w.state = 'idle'; else if (S_.stockTotal(sh) + sh.inflight >= sh.cap) w.state = sto ? 'tosto' : 'toshop'; }
+        });
+        return;
+      }
+      w.state = 'tosto';
+      if (!sto) { this.idle(w, dt); return; }
+      if (this.goTo(w, sto.pos.x, sto.pos.z, dt, 0.8)) act(0.08, () => {
+        if (!S_.storeOne(w) && w.bag.every(it => it.state === 'bag')) { if (!w.bag.length) { w.state = 'idle'; w.sellTurn = true; } }
+      });
+      return;
+    }
+    // 倉庫の余りを売りに行く（倉庫へ運んだ次は、余りがあれば売りに行く番）
+    const surplus = () => sto && Object.keys(S.storage).find(k => S.storage[k] > STORAGE.keep && open.some(sh => sh.sells.includes(k) && S_.stockTotal(sh) + sh.inflight < sh.cap));
+    if (w.sellTurn && w.state !== 'load') {
+      w.sellTurn = false;
+      const k = surplus();
+      if (k) { w.state = 'sfetch'; w.fetchKind = k; return; }
+    }
+    // 加工場・鉱山の出口から積む（倉庫があれば全部、なければお店で売っている物だけ）
+    const can = p => p.site.done && !p.kitchen && (sto ? S_.storageRoom() > 0 : open.some(sh => sh.sells.includes(p.to)));
+    if (w.state !== 'load' || !w.src || !can(w.src) || S_.st(w.src).out <= 0) {
       let best = null, most = 0;
-      for (const p of this.stations.proc) { if (!p.site.done || !sold(p.to)) continue; const o = this.stations.st(p).out; if (o > most) { most = o; best = p; } }
+      for (const p of S_.proc) { if (!can(p)) continue; const o = S_.st(p).out; if (o > most) { most = o; best = p; } }
       w.src = best; w.state = best ? 'load' : 'idle';
-      if (!best) { if (w.bag.length) w.state = 'stock'; else this.goTo(w, open[0].stock.x - 1.2, open[0].stock.z + 1.2, dt, 0.4); return; }
     }
-    if (this.goTo(w, w.src.outPos.x, w.src.outPos.z, dt, 0.9)) {
-      w.actT -= dt;
-      if (w.actT <= 0) {
-        w.actT = 0.1 / this.workMul(w);
-        if (!this.stations.takeOne(w.src, w, player, hooks)) w.state = w.bag.length ? 'stock' : 'idle';
-      }
+    if (w.state === 'load') {
+      if (this.goTo(w, w.src.outPos.x, w.src.outPos.z, dt, 0.9)) act(0.1, () => {
+        if (w.bag.length >= w.cap || !S_.takeOne(w.src, w, player, hooks)) w.state = w.bag.length ? (sto ? 'tosto' : 'toshop') : 'idle';
+      });
+      return;
     }
+    // 出口に何もなければ、倉庫の余りを売りに行く
+    const k = surplus();
+    if (k) { w.state = 'sfetch'; w.fetchKind = k; return; }
+    const home = sto ? sto.pos : open.length ? open[0].stock : null;
+    if (home) this.goTo(w, home.x - 1.2, home.z + 1.2, dt, 0.4); else this.idle(w, dt);
   }
 
   // 兵士：主人公の近くの敵を優先して、買った土地の敵を自動で倒す（ぬしは主人公にまかせる）

@@ -233,7 +233,7 @@ function onKill(e, byWorker = false) {
   if (!e.minion) {
     // 兵士が倒した分は、倉庫があれば倉庫へ直接しまう
     const total = Object.values(S.storage).reduce((a, b) => a + b, 0);
-    if (byWorker && stations.storageReady() && total < STORAGE.cap) {
+    if (byWorker && stations.storageReady() && total < stations.storageCap()) {
       for (const k in def.drop) { S.storage[k] = (S.storage[k] || 0) + def.drop[k]; S.book.mat[k] = 1; }
       floatText('📦', e.x, 1.4, e.z, 'coin');
     } else for (const k in def.drop) popDrops(k, def.drop[k], e.x, e.z, 0.5 + y);
@@ -415,8 +415,10 @@ const game = {
     saveNow();
   },
   // 施設の強化
-  facilities: () => stations.proc.filter(p => p.site.done).map(p => ({ id: p.id, name: t('b_' + p.site.def.model), icon: p.to, lv: stations.lv(p), cap: p.def.inCap || p.def.outCap })),
+  facilities: () => [...(stations.storageReady() ? [{ id: 'storage', storage: true, name: t('b_storage'), icon: 'box', lv: stations.storageLv(), cap: stations.storageCap(), used: stations.storageTotal() }] : []),
+    ...stations.proc.filter(p => p.site.done).map(p => ({ id: p.id, name: t('b_' + p.site.def.model), icon: p.to, lv: stations.lv(p), cap: p.def.inCap || p.def.outCap }))],
   buyFacility(id) {
+    if (id === 'storage') return game.buyStorage();
     const p = stations.get(id), lv = stations.lv(p);
     if (lv >= FACILITY.costs.length) return;
     const c = FACILITY.costs[lv];
@@ -431,6 +433,24 @@ const game = {
     sfx.build();
     missions.event('facility');
     hud.toast(`🏗 ${t('facUp', { b: t('b_' + d.model), n: lv + 2 })}`, 'good');
+    saveNow();
+  },
+  // 倉庫の強化（預けられる数が増える）
+  buyStorage() {
+    const lv = stations.storageLv();
+    if (!stations.storageReady() || lv >= STORAGE.costs.length) return;
+    const c = STORAGE.costs[lv];
+    if (S.coins < c.coin) return;
+    for (const m in c) if (m !== 'coin' && game.bagCount(m) < c[m]) return;
+    for (const m in c) if (m !== 'coin') stations.useMaterial(player, m, c[m]);
+    S.coins -= c.coin; S.fac.storage = lv + 1;
+    const site = stations.storage.site, d = site.def;
+    burst(d.x, 2, d.z, { n: 30, colors: [0xffe066, 0xffffff, 0x8fd3ff], speed: 4, up: 5, size: 0.14, life: 0.9 });
+    ring(d.x, d.z, 0xffe7a0, 4, 0.5); shake(0.25); vib(40);
+    site.anim = 0;
+    sfx.build();
+    missions.event('facility');
+    hud.toast(`🏗 ${t('storageUp', { n: lv + 2, c: stations.storageCap() })}`, 'good');
     saveNow();
   },
   // 住民の仕事の強化
@@ -1071,6 +1091,8 @@ function drawLabels() {
       hud.label('kitchen', `🍳 ${kit.cooking ? iconImg(kit.cooking) : ''} ${have || t('kitchenEmpty')}`, kit.inPos.x, 1.1, kit.inPos.z, 'st-label shop');
     }
     // 施設のレベル
+    const sd = stations.storageReady() && stations.storage.site.def;
+    if (sd && stations.storageLv() > 0 && close(sd.x, sd.z)) hud.label('fac-storage', t('lv', { n: stations.storageLv() + 1 }), sd.x, 3.9, sd.z, 'fac-label');
     for (const p of stations.proc) if (p.site.done && stations.lv(p) > 0 && close(p.site.def.x, p.site.def.z)) hud.label('fac-' + p.id, t('lv', { n: stations.lv(p) + 1 }), p.site.def.x, 3.9, p.site.def.z, 'fac-label');
     // 住民の依頼（かなえたら ✓）
     for (const r of S.requests) {
@@ -1086,7 +1108,7 @@ function drawLabels() {
     const sto = stations.storage;
     if (sto && sto.site.done && close(sto.pos.x, sto.pos.z)) {
       const chips = Object.keys(S.storage).filter(k => S.storage[k] > 0).map(k => `${iconImg(k)}<b>${S.storage[k]}</b>`).join(' ');
-      hud.label('store', `${t('s_store')} ${chips}`, sto.pos.x, 1.1, sto.pos.z, 'st-label store');
+      hud.label('store', `${t('s_store')} <small>${stations.storageTotal()}/${stations.storageCap()}</small> ${chips}`, sto.pos.x, 1.1, sto.pos.z, 'st-label store');
     }
     // ミッションの目的地
     const tg = missionTarget();

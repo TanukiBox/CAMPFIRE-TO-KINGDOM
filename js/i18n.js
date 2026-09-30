@@ -127,7 +127,7 @@ const TEXT = {
     boss_bigslime: '沼のぬし 大スライム', boss_goblinchief: '砦のぬし ゴブリンの親分', boss_golem: '谷のぬし 岩の巨人', boss_dragon: '竜の巣のぬし ドラゴン', bossAppear: 'ぬしが現れた！',
     // 強化
     tabSelf: '自分', tabFac: '施設', facCap: '置ける量', facSpeed: '速さ', facNone: '強化できる施設は まだありません',
-    facDesc: '施設を強化すると 置ける量と作る速さが上がり、見た目も豪華になる', facUp: '{b}が Lv{n} になった！',
+    facDesc: '施設を強化すると 置ける量と作る速さが上がり、見た目も豪華になる', facUp: '{b}が Lv{n} になった！', storageUp: '倉庫が Lv{n} になった！（{c}個まで）', nowIn: 'いま{n}個',
     jobUp: '{j}が Lv{n} になった！', jobUpDesc: '雇った仕事を強化すると 運べる数・歩く速さ・作業の速さが上がる',
     music: 'BGM', vibrate: '振動',
     upTitle: '強化', up_bag: '背中の積載量', up_speed: '移動速度', up_hp: 'HP',
@@ -153,7 +153,7 @@ const TEXT = {
     // 住民
     hireTitle: '住民', hireInfo: '住民 {p}人（働いている {w}人・手があいている {f}人）',
     job_lumber: '木こり', job_miner: '鉱夫', job_carrier: '運び手', job_keeper: '店番', job_herbalist: '薬草つみ', job_soldier: '兵士',
-    jd_lumber: '木を切って 製材所に運ぶ', jd_miner: '岩を割って 石工場に運ぶ', jd_carrier: '板や石材を お店に並べる', jd_keeper: '売るのが速くなり コインを集めてくれる', jd_herbalist: '薬草をつんで 薬屋に運ぶ', jd_soldier: '近くの敵を自動で倒す（ぬしは倒さない）',
+    jd_lumber: '木を切って 製材所に運ぶ', jd_miner: '岩を割って 石工場に運ぶ', jd_carrier: '加工場の品を倉庫へ運び、30個をこえた分は市場・港へ。食堂に材料も運ぶ', jd_keeper: '売るのが速くなり コインを集めてくれる', jd_herbalist: '薬草をつんで 薬屋に運ぶ', jd_soldier: '近くの敵を自動で倒す（ぬしは倒さない）',
     hire: '雇う', needB: '{b}が必要', noFree: '手があいている住民がいません。家を建てよう', hiredN: '{n}人', hired: '{j}を雇った！',
     // タイトル
     start: 'はじめる', cont: 'つづきから', debugTitle: 'デバッグ：章を選ぶ（素材・コイン大量）', chN: '第{n}章',
@@ -305,7 +305,7 @@ const TEXT = {
     fell: 'You fainted…', dropped: 'Dropped {n} materials', droppedNone: 'You woke up by the campfire',
     boss_bigslime: 'Swamp Boss: Big Slime', boss_goblinchief: 'Fort Boss: Goblin Chief', boss_golem: 'Valley Boss: Rock Giant', boss_dragon: 'Nest Boss: Dragon', bossAppear: 'The boss appears!',
     tabSelf: 'You', tabFac: 'Facilities', facCap: 'Capacity', facSpeed: 'Speed', facNone: 'No facilities to upgrade yet',
-    facDesc: 'Upgrading raises capacity and production speed, and makes the building fancier', facUp: '{b} is now Lv{n}!',
+    facDesc: 'Upgrading raises capacity and production speed, and makes the building fancier', facUp: '{b} is now Lv{n}!', storageUp: 'Storehouse is now Lv{n}! (holds {c})', nowIn: '{n} stored',
     jobUp: '{j} is now Lv{n}!', jobUpDesc: 'Upgrade a job to raise carry amount, walking speed and work speed',
     music: 'Music', vibrate: 'Vibration',
     upTitle: 'Upgrade', up_bag: 'Carry limit', up_speed: 'Move speed', up_hp: 'HP',
@@ -330,7 +330,7 @@ const TEXT = {
     upgraded: '{x} upgraded!',
     hireTitle: 'People', hireInfo: '{p} villagers ({w} working, {f} free)',
     job_lumber: 'Lumberjack', job_miner: 'Miner', job_carrier: 'Carrier', job_keeper: 'Shopkeeper', job_herbalist: 'Herbalist', job_soldier: 'Soldier',
-    jd_lumber: 'Chops trees, brings wood to the sawmill', jd_miner: 'Breaks rocks, brings stone to the stoneworks', jd_carrier: 'Stocks planks and blocks at the shop', jd_keeper: 'Sells faster and collects coins for you', jd_herbalist: 'Picks herbs, brings them to the pharmacy', jd_soldier: 'Defeats nearby enemies automatically (not bosses)',
+    jd_lumber: 'Chops trees, brings wood to the sawmill', jd_miner: 'Breaks rocks, brings stone to the stoneworks', jd_carrier: 'Carries goods to the storehouse, sells extras over 30 at markets/harbor, and supplies the diner', jd_keeper: 'Sells faster and collects coins for you', jd_herbalist: 'Picks herbs, brings them to the pharmacy', jd_soldier: 'Defeats nearby enemies automatically (not bosses)',
     hire: 'Hire', needB: 'Needs {b}', noFree: 'No free villagers. Build a house!', hiredN: '×{n}', hired: 'Hired a {j}!',
     start: 'Start', cont: 'Continue', debugTitle: 'Debug: pick a chapter (lots of materials & coins)', chN: 'Chapter {n}',
     clearTitle_1: 'Chapter 1 Clear!', clearSub_1: 'The ruins with only a campfire became a village!',
