@@ -803,7 +803,7 @@ function settingsTexts() {
   $('btnReset').textContent = t('reset');
   $('resetMsg').textContent = t('resetAsk');
   $('btnResetYes').textContent = t('yes'); $('btnResetNo').textContent = t('cancel');
-  $('btnClose').textContent = t('close');
+  $('btnClose').setAttribute('aria-label', t('close'));
   $('btnAway').textContent = t('debugAway');
   $('btnAway').hidden = !DEBUG;
 }

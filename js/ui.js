@@ -50,7 +50,8 @@ export const ui = {
 
   render() {
     const f = this['r_' + this.open];
-    if (f) $('sheet').innerHTML = f.call(this, this.data);
+    const x = ['upgrade', 'smithy', 'hire', 'book'].includes(this.open) ? `<button class="x-close" data-act="close" aria-label="${t('close')}">×</button>` : '';
+    if (f) $('sheet').innerHTML = x + f.call(this, this.data);
   },
 
   // 素材とコインの値段の表示。買えるかどうかも返す
@@ -85,7 +86,7 @@ export const ui = {
         if (!max) { const cv = this.costView(FACILITY.costs[f.lv]); mats = cv.mats; btn = `<button class="buy" data-act="fac:${f.id}" ${cv.ok ? '' : 'disabled'}>${coinTag(FACILITY.costs[f.lv].coin)}</button>`; }
         return `<div class="row"><div class="row-ico">${iconImg(f.icon)}</div><div class="row-main"><b>${f.name} <span class="cnt">${t('lv', { n: f.lv + 1 })}</span></b><small>${eff}</small><div class="costs">${mats}</div></div>${btn}</div>`;
       }).join('') : `<p class="sub">${t('facNone')}</p>`;
-      return `<h2>${iconImg('hammer')} ${t('upTitle')}</h2>${tabs}<p class="sub">${t('facDesc')}</p>${rows}<button class="close" data-act="close">${t('close')}</button>`;
+      return `<h2>${iconImg('hammer')} ${t('upTitle')}</h2>${tabs}<p class="sub">${t('facDesc')}</p>${rows}`;
     }
     const rows = Object.keys(UPGRADES).map(k => {
       const u = UPGRADES[k], lv = S.up[k], max = lv >= u.costs.length;
@@ -94,7 +95,7 @@ export const ui = {
       const btn = max ? `<button class="buy" disabled>${t('max')}</button>` : `<button class="buy" data-act="up:${k}" ${S.coins < cost ? 'disabled' : ''}>${coinTag(cost)}</button>`;
       return `<div class="row"><div class="row-ico">${iconImg({ bag: 'bag', speed: 'boot', hp: 'heart' }[k])}</div><div class="row-main"><b>${t('up_' + k)}</b><small>${t('lv', { n: lv + 1 })}　${cur}${next}</small></div>${btn}</div>`;
     }).join('');
-    return `<h2>${iconImg('hammer')} ${t('upTitle')}</h2>${tabs}<p class="sub">${t('upDesc')}</p>${rows}<button class="close" data-act="close">${t('close')}</button>`;
+    return `<h2>${iconImg('hammer')} ${t('upTitle')}</h2>${tabs}<p class="sub">${t('upDesc')}</p>${rows}`;
   },
 
   // 鍛冶屋：武器・防具を作る、道具を強くする
@@ -113,7 +114,7 @@ export const ui = {
         else { const cv = this.costView(it.cost); mats = cv.mats; btn = `<button class="buy" data-act="craft:${tab}.${it.id}" ${cv.ok ? '' : 'disabled'}>${coinTag(it.cost.coin)}</button>`; }
         return `<div class="row${on ? ' on' : ''}"><div class="row-ico">${iconImg((tab === 'w' ? 'w_' : 'a_') + it.id)}</div><div class="row-main"><b>${t((tab === 'w' ? 'w_' : 'a_') + it.id)}</b><small class="stat">${eff}</small><div class="costs">${mats}</div></div>${btn}</div>`;
       }).join('');
-      return `<h2>${t('smithTitle')}</h2>${tabs}${me}<p class="sub">${t('smithDesc_' + tab)}</p>${rows}<button class="close" data-act="close">${t('close')}</button>`;
+      return `<h2>${t('smithTitle')}</h2>${tabs}${me}<p class="sub">${t('smithDesc_' + tab)}</p>${rows}`;
     }
     const rows = Object.keys(TOOLS).map(k => {
       const u = TOOLS[k], lv = S.tool[k], max = lv >= u.costs.length;
@@ -131,7 +132,7 @@ export const ui = {
       }
       return `<div class="row"><div class="row-ico">${iconImg(k)}</div><div class="row-main"><b>${t('tool_' + k)}</b><small>${t('eff_' + k)} ${t('lv', { n: lv + 1 })}　${cur}${next}</small><div class="costs">${costs}</div></div>${btn}</div>`;
     }).join('');
-    return `<h2>${t('smithTitle')}</h2>${tabs}<p class="sub">${t('smithDesc')}</p>${rows}<button class="close" data-act="close">${t('close')}</button>`;
+    return `<h2>${t('smithTitle')}</h2>${tabs}<p class="sub">${t('smithDesc')}</p>${rows}`;
   },
 
   r_hire() {
@@ -150,7 +151,7 @@ export const ui = {
       return `<div class="row"><div class="row-ico job" style="--c:#${j.color.toString(16).padStart(6, '0')}"></div><div class="row-main"><b>${t('job_' + k)} <span class="cnt">${n ? t('hiredN', { n }) + '・' + t('lv', { n: lv + 1 }) : ''}</span></b><small>${why || t('jd_' + k)}</small></div><div class="btns">${btn}${up}</div></div>`;
     }).join('');
     const note = free <= 0 ? `<p class="warn">${t('noFree')}</p>` : '';
-    return `<h2>${iconImg('people')} ${t('hireTitle')}</h2><p class="sub">${t('hireInfo', { p: pop, w: S.hired.length, f: free })}<br>${t('jobUpDesc')}</p>${note}${rows}<button class="close" data-act="close">${t('close')}</button>`;
+    return `<h2>${iconImg('people')} ${t('hireTitle')}</h2><p class="sub">${t('hireInfo', { p: pop, w: S.hired.length, f: free })}<br>${t('jobUpDesc')}</p>${note}${rows}`;
   },
 
   // 図鑑：モンスター・素材・料理。まだ出会っていないものは影だけ
@@ -180,7 +181,7 @@ export const ui = {
       }).join('');
     }
     const found = keys.filter(k => (tab === 'mon' ? S.book.mon : tab === 'mat' ? S.book.mat : S.book.dish)[k]).length;
-    return `<h2>${iconImg('book')} ${t('bookTitle')}</h2>${tabs}<p class="book-sum">${t('bkFound', { n: found, m: keys.length })}</p><div class="book-grid">${cards}</div><button class="close" data-act="close">${t('close')}</button>`;
+    return `<h2>${iconImg('book')} ${t('bookTitle')}</h2>${tabs}<p class="book-sum">${t('bkFound', { n: found, m: keys.length })}</p><div class="book-grid">${cards}</div>`;
   },
 
   r_clear(d) {

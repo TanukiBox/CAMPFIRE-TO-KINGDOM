@@ -152,6 +152,15 @@ html, body {
   box-shadow: 0 10px 30px rgba(0, 0, 0, .2); display: flex; flex-direction: column; gap: 12px;
 }
 .sheet h2 { margin: 0; font-size: 20px; text-align: center; }
+/* 右上の閉じるボタン（スクロールしても見える） */
+.sheet .x-close {
+  position: sticky; top: 0; z-index: 3; align-self: flex-end; flex: none;
+  width: 38px; height: 38px; margin: -8px -8px -50px 0; padding: 0; border-radius: 50%;
+  border: 2px solid var(--line); background: #fff; color: #8a6a4e; font: inherit; font-size: 24px; font-weight: 800; line-height: 1;
+  box-shadow: var(--shadow); cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.sheet .x-close:active { transform: scale(.92); }
+.sheet .x-close + h2 { padding: 0 34px; }
 .set-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-weight: 700; }
 .set-row.col { flex-direction: column; align-items: stretch; }
 .seg { display: flex; gap: 6px; }

@@ -129,18 +129,18 @@ export class Workers {
     const open = S_.shops.filter(sh => sh.site.done && !sh.kitchen);
     const act = (t, f) => { w.actT -= dt; if (w.actT <= 0) { w.actT = t / this.workMul(w); f(); } };
     // 厨房へ
-    if (w.state === 'kdeliver' || w.state === 'kfetch' || (!w.bag.length && S_.kitchenWants())) {
+    if (w.state === 'kdeliver' || w.state === 'kfetch' || (!w.bag.length && S_.kitchenWants(w))) {
       if (w.state !== 'kdeliver') {
         w.state = 'kfetch';
         if (this.goTo(w, sto.pos.x, sto.pos.z, dt, 0.8)) act(0.08, () => {
-          const m = S_.kitchenWants();
+          const m = S_.kitchenWants(w);
           if (m && w.bag.length < w.cap) { S.storage[m]--; this.items.give(w, m, sto.door.x, 1, sto.door.z); }
           else w.state = w.bag.length ? 'kdeliver' : 'idle';
         });
         return;
       }
       if (this.goTo(w, kit.inPos.x, kit.inPos.z, dt, 0.7)) act(0.1, () => {
-        if (!S_.feedOne(kit, w, player, hooks) && w.bag.every(it => it.state === 'bag')) w.state = w.bag.length ? 'kdeliver' : 'idle';
+        if (!S_.feedOne(kit, w, player, hooks) && w.bag.every(it => it.state === 'bag')) w.state = w.bag.length ? 'tosto' : 'idle';
       });
       return;
     }

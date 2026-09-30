@@ -274,10 +274,17 @@ export class Stations {
   }
 
   // 厨房が今ほしい材料（倉庫にあって、厨房に空きがあるもの）
-  kitchenWants() {
+  kitchenWants(c = null) {
     const k = this.kitchen;
     if (!k || !k.site.done || !this.storageReady()) return null;
-    return INGREDIENTS.find(m => (S.storage[m] || 0) > 0 && this.inCount(k, m) < this.inCap(k)) || null;
+    // m と組み合わせる材料が（厨房と倉庫に）あと何個あるか。その数までしか運ばない
+    const have = x => this.inCount(k, x) + (S.storage[x] || 0);
+    const pairs = m => Math.max(0, ...RECIPES.filter(r => r.need[m]).map(r => Math.min(Infinity, ...Object.keys(r.need).filter(x => x !== m).map(have))));
+    return INGREDIENTS.find(m => {
+      if (!(S.storage[m] > 0)) return false;
+      const n = this.inCount(k, m) + (c ? this.items.count(c, m) : 0);
+      return n < this.inCap(k) && n < pairs(m);
+    }) || null;
   }
   // 材料がそろっている中で いちばん高い料理
   recipeFor(k) { return RECIPES.find(r => Object.keys(r.need).every(m => this.inCount(k, m) >= r.need[m])) || null; }
