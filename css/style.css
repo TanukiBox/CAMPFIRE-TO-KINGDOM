@@ -291,6 +291,19 @@ hr.sep { border: 0; border-top: 2px dashed var(--line); margin: 4px 0; width: 10
 .chest-res.r2 { box-shadow: 0 0 16px #b58ae0; }
 @keyframes chestpop { 0% { transform: scale(.3) rotate(-8deg); opacity: 0; } 60% { transform: scale(1.08) rotate(2deg); } }
 @keyframes chestspin { 0% { transform: rotateY(360deg) scale(.4); } 100% { transform: none; } }
+.confirm-back { position: absolute; inset: 0; z-index: 5; background: rgba(43, 29, 20, .35); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.confirm-back[hidden] { display: none; }
+.confirm {
+  width: min(300px, 100%); background: var(--card); border: 3px solid #f2c3b9; border-radius: 18px; padding: 16px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; box-shadow: 0 10px 30px rgba(0, 0, 0, .25); animation: popin .3s cubic-bezier(.3, 1.6, .5, 1);
+}
+.confirm p { margin: 2px 0; font-size: 14px; font-weight: 700; }
+.confirm .warn { color: var(--red); font-size: 12px; }
+.confirm-get { display: flex; gap: 10px; font-weight: 800; font-size: 17px; }
+.confirm-get .ico { width: 22px; height: 22px; }
+.confirm-btns { display: flex; gap: 8px; width: 100%; margin-top: 4px; }
+.confirm-btns button { flex: 1; font: inherit; font-weight: 800; border-radius: 12px; border: 2px solid #f1cf73; background: #fff3d6; color: #8a5a00; padding: 9px; cursor: pointer; }
+.confirm-btns button.drop { background: #fff0ec; border-color: #f2c3b9; color: #b04a3a; }
 .sell-btns { display: flex; gap: 4px; flex: none; }
 .sheet button.buy.sell { min-width: 0; padding: 5px 7px; font-size: 13px; display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
 .sheet button.buy.sell small { font-size: 11px; }

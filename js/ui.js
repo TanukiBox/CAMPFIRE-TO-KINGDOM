@@ -33,7 +33,8 @@ export const ui = {
       else if (act === 'fac') { game.buyFacility(arg); this.render(); }
       else if (act === 'jobup') { game.buyJob(arg); this.render(); }
       else if (act === 'craft') { const [k, id] = arg.split('.'); game.craft(k, id); this.render(); }
-      else if (act === 'dis') { game.dismantle(arg); this.render(); }
+      // 分解は確かめてから
+      else if (act === 'dis') this.confirmDismantle(arg);
       else if (act === 'alc') { const [u, f] = arg.split('.'); game.alchemy(u, f); this.render(); }
       else if (act === 'buyc') { game.buyChest(arg); this.render(); }
       else if (act === 'openc') { const res = game.openChest(arg); this.data = { ...(this.data || {}), result: res }; this.render(); }
@@ -49,6 +50,27 @@ export const ui = {
 
   blocking() { return !!this.open; },
 
+  // 分解してよいか確かめる小窓
+  confirmDismantle(u) {
+    const g = this.game, w = S.weapons.find(x => x.u === +u), v = g.dismantleValue(u);
+    if (!w || !v) return;
+    const box = $('confirm');
+    box.innerHTML = `<div class="confirm">
+      <div class="row-ico">${iconImg('w_' + w.b)}</div>
+      <b>${wName(w)}</b>
+      <small class="stat">${wInfo(w)}</small>
+      <p>${t('disAsk')}</p>
+      <div class="confirm-get">${coinTag(v.coin)}${v.star ? `<span class="cost-coin">${iconImg('star')}${v.star}</span>` : ''}</div>
+      <p class="warn">${t('disWarn')}</p>
+      <div class="confirm-btns"><button type="button" class="buy" data-c="no">${t('cancel')}</button><button type="button" class="buy sell drop" data-c="yes">${t('dismantle')}</button></div>
+    </div>`;
+    box.hidden = false;
+    const done = yes => { box.hidden = true; box.innerHTML = ''; if (yes) { g.dismantle(u); this.render(); } };
+    box.querySelector('[data-c="yes"]').onclick = () => done(true);
+    box.querySelector('[data-c="no"]').onclick = () => done(false);
+    box.onpointerdown = e => { if (e.target === box) done(false); };
+  },
+
   show(name, data) {
     this.open = name; this.data = data;
     $('sheetModal').hidden = false;
@@ -57,6 +79,7 @@ export const ui = {
   },
   close() {
     const was = this.open;
+    $('confirm').hidden = true;
     this.open = null;
     $('sheetModal').hidden = true;
     if (was && this.game.onClose) this.game.onClose(was);

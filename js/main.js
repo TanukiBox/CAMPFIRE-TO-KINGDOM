@@ -594,14 +594,20 @@ const game = {
     saveNow();
   },
   // いらない武器を分解してコインに（効果が2つ以上なら星のかけらも）
+  // 分解でもらえる物（コインと、エピック以上なら星のかけら）
+  dismantleValue(u) {
+    const w = S.weapons.find(x => x.u === +u);
+    if (!w) return null;
+    const tier = WEAPONS.findIndex(x => x.id === w.b);
+    return { coin: (tier + 1) * 30 * (1 + w.r) * (1 + w.p), star: w.r >= 2 ? w.r - 1 : 0 };
+  },
   dismantle(u) {
     const i = S.weapons.findIndex(w => w.u === +u);
     if (i < 0 || S.weapons[i].u === S.wu) return;
-    const w = S.weapons[i], tier = WEAPONS.findIndex(x => x.id === w.b);
+    const w = S.weapons[i], v = game.dismantleValue(u), coinsBack = v.coin;
     S.weapons.splice(i, 1);
-    const coinsBack = (tier + 1) * 30 * (1 + w.r) * (1 + w.p);
     addCoins(coinsBack);
-    if (w.r >= 2) S.storage.star = (S.storage.star || 0) + (w.r - 1);
+    if (v.star) S.storage.star = (S.storage.star || 0) + v.star;
     sfx.anvil();
     hud.toast(`🔨 ${t('dismantled', { c: coinsBack })}${w.r >= 2 ? ` ${iconImg('star')}+${w.r - 1}` : ''}`, 'good');
     saveNow();
