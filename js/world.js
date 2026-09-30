@@ -273,6 +273,42 @@ export class World {
     this.glow.material.opacity = 0.6 + Math.sin(t * 8) * 0.08;
   }
 
+  // (fx,fz)→(tx,tz) のまっすぐな道が建物をふさいでいたら、建物の角を回る中継点を返す（ふさいでいなければ null）
+  detour(fx, fz, tx, tz, m = 0.7) {
+    let hit = null, best = Infinity;
+    for (const b of this.boxes) {
+      if (b.off && b.off()) continue;
+      // 行き先や今いる所が建物のすぐそば（中）なら、その建物はよけない（戸口や店番の場所）
+      const inside = (x, z) => x > b.x0 - m && x < b.x1 + m && z > b.z0 - m && z < b.z1 + m;
+      if (inside(tx, tz)) continue;
+      const t = segBox(fx, fz, tx, tz, b.x0 - 0.2, b.x1 + 0.2, b.z0 - 0.2, b.z1 + 0.2);
+      if (t !== null && t < best) { best = t; hit = b; }
+    }
+    if (!hit) return null;
+    const x0 = hit.x0 - m, x1 = hit.x1 + m, z0 = hit.z0 - m, z1 = hit.z1 + m;
+    const corners = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+    const blocked = (ax, az, bx, bz) => segBox(ax, az, bx, bz, hit.x0 + 0.05, hit.x1 - 0.05, hit.z0 + 0.05, hit.z1 - 0.05) !== null;
+    // 角から目的地までの残りの道のり（ふさがっていれば、となりの角を回る）
+    const rest = (i) => {
+      const [cx, cz] = corners[i];
+      if (!blocked(cx, cz, tx, tz)) return Math.hypot(tx - cx, tz - cz);
+      let r = Infinity;
+      for (const k of [(i + 1) % 4, (i + 3) % 4]) {
+        const [nx, nz] = corners[k];
+        if (!blocked(nx, nz, tx, tz)) r = Math.min(r, Math.hypot(nx - cx, nz - cz) + Math.hypot(tx - nx, tz - nz));
+      }
+      return r === Infinity ? 1000 : r;
+    };
+    let wp = null, cost = Infinity;
+    corners.forEach(([cx, cz], i) => {
+      // 今いる角は使わない。今いる所から見えている角だけ使う
+      if (Math.hypot(cx - fx, cz - fz) < 0.35 || blocked(fx, fz, cx, cz)) return;
+      const c = Math.hypot(cx - fx, cz - fz) + rest(i);
+      if (c < cost) { cost = c; wp = { x: cx, z: cz }; }
+    });
+    return wp;
+  }
+
   // 丸い物と四角い物からはみ出さないように押し戻し、歩ける土地の中に収める
   // area: 歩ける四角の一覧（insetRects 済み）。null なら収めない
   resolve(p, r, area = this.ownedInset) {
@@ -301,6 +337,19 @@ export class World {
     }
     p.x = bx; p.z = bz;
   }
+}
+
+// 線分と四角が交わるなら、線分の始点からの割合（0〜1）を返す
+function segBox(ax, az, bx, bz, x0, x1, z0, z1) {
+  let t0 = 0, t1 = 1;
+  const dx = bx - ax, dz = bz - az;
+  for (const [p, q] of [[-dx, ax - x0], [dx, x1 - ax], [-dz, az - z0], [dz, z1 - az]]) {
+    if (p === 0) { if (q < 0) return null; continue; }
+    const r = q / p;
+    if (p < 0) { if (r > t1) return null; if (r > t0) t0 = r; }
+    else { if (r < t0) return null; if (r < t1) t1 = r; }
+  }
+  return t0;
 }
 
 // 草は3本の葉を1株にまとめる

@@ -22,8 +22,8 @@ const flyDur = (it, to) => 0.3 + Math.min(0.5, Math.hypot(it.p.x - to.x, it.p.z 
 const place = (tile, x, z, y = 0) => { tile.group.position.set(x, y, z); scene.add(tile.group); return tile; };
 
 export class Stations {
-  constructor(ch, builds, items, coins) {
-    this.items = items; this.coins = coins;
+  constructor(ch, builds, items, coins, world) {
+    this.items = items; this.coins = coins; this.world = world;
     this.proc = []; this.shops = []; this.shop = null; this.anvil = null; this.storage = null; this.inn = null;
     this.gate = ch.gate;
     for (const site of builds.sites) {
@@ -272,11 +272,15 @@ export class Stations {
 
   // 人を門からある場所へ歩かせる。着いたら true
   walk(c, dt, speed = 2.4) {
-    const dx = c.tx - c.x, dz = c.tz - c.z, d = Math.hypot(dx, dz);
+    const d = Math.hypot(c.tx - c.x, c.tz - c.z);
     c.moving = d > 0.12 ? 1 : 0;
     if (!c.moving) return true;
-    const sp = Math.min(d, speed * dt);
-    c.x += dx / d * sp; c.z += dz / d * sp; c.walk += dt * 10;
+    // 建物がじゃまなら、角を回って進む
+    const wp = this.world ? this.world.detour(c.x, c.z, c.tx, c.tz, 0.6) : null;
+    const gx = wp ? wp.x : c.tx, gz = wp ? wp.z : c.tz;
+    const dx = gx - c.x, dz = gz - c.z, dd = Math.hypot(dx, dz) || 1;
+    const sp = Math.min(dd, speed * dt);
+    c.x += dx / dd * sp; c.z += dz / dd * sp; c.walk += dt * 10;
     c.yaw = Math.atan2(dx, dz);
     return false;
   }

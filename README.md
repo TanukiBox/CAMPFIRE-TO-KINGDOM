@@ -69,4 +69,6 @@ py -m http.server 8131
 → http://localhost:8131/
 
 ## 公開
+更新を push する前に `py tools/version.py` を実行する（全ファイルの読み込みに版番号が付き、スマホに古いファイルが残らない）。
+
 Settings → Pages → Source を **Deploy from a branch**、Branch を **main** / **(root)** にすると https://tanukibox.github.io/CAMPFIRE-TO-KINGDOM/ で遊べる。

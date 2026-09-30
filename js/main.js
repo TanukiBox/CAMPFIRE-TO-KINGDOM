@@ -54,7 +54,7 @@ const coins = new Coins();
 const enemies = new Enemies(ch, world);
 const builds = new Builds(ch, world);
 if (hasSave) builds.load(save.builds);
-const stations = new Stations(ch, builds, items, coins);
+const stations = new Stations(ch, builds, items, coins, world);
 const workers = new Workers(world, builds, resources, stations, items, enemies);
 const missions = new Missions(ch.missions);
 world.addTown(ch.towns);

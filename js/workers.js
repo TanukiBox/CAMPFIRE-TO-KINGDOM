@@ -45,10 +45,14 @@ export class Workers {
   keeper() { return this.list.find(w => w.job === 'keeper') || null; }
 
   goTo(w, x, z, dt, r = 0.15) {
-    const dx = x - w.x, dz = z - w.z, d = Math.hypot(dx, dz);
+    const d = Math.hypot(x - w.x, z - w.z);
     if (d < r) { w.moving = 0; return true; }
-    const sp = Math.min(d, SPEED * dt);
-    w.x += dx / d * sp; w.z += dz / d * sp;
+    // 建物がじゃまなら、角を回って進む
+    const wp = this.world.detour(w.x, w.z, x, z);
+    if (wp) { x = wp.x; z = wp.z; }
+    const dx = x - w.x, dz = z - w.z, dd = Math.hypot(dx, dz) || 1;
+    const sp = Math.min(dd, SPEED * dt);
+    w.x += dx / dd * sp; w.z += dz / dd * sp;
     w.yaw = Math.atan2(dx, dz); w.walk += dt * 10; w.moving = 1;
     return false;
   }
